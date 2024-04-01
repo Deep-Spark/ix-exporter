@@ -1,0 +1,39 @@
+# Copyright (c) 2024, Shanghai Iluvatar CoreX Semiconductor Co., Ltd.
+# All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+port: 32021
+enableKubernetes: true
+metrics:
+  - name: "ix_temperature"
+    help: "The temperature of iluvatar GPU (C)."
+  - name: "ix_fan_speed"
+    help: "Fan speed of iluvatar GPU"
+  - name: "ix_sm_clock"
+    help: "Sm clock of iluvatar GPU (MHz)."
+  - name: "ix_mem_clock"
+    help: "Mem clock of iluvatar GPU (MHz)."
+  - name: "ix_mem_total"
+    help: "The total physical memory of iluvatar GPU (MiB)."
+  - name: "ix_mem_used"
+    help: "The used physical memory of iluvatar GPU (MiB)."
+  - name: "ix_mem_free"
+    help: "The free physical memory of iluvatar GPU (MiB)."
+  - name: "ix_mem_utilization"
+    help: "The memory utilization of iluvatar GPU (%)."
+  - name: "ix_gpu_utilization"
+    help: "The utilization of iluvatar GPU (%)."
+  - name: "ix_power_usage"
+    help: "The power usage of iluvatar GPU."
