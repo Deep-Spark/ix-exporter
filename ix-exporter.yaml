@@ -13,11 +13,61 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+apiVersion: v1
+kind: ConfigMap
+data:
+  ix-config: |-
+    version: "4.2.0"
+    flags:
+      splitboard: false
 
+metadata:
+  name: ix-config
+  namespace: kube-system
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ix-exporter
+  namespace: "kube-system"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ix-exporter
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ix-exporter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ix-exporter
+subjects:
+- kind: ServiceAccount
+  name: ix-exporter
+  namespace: "kube-system"
+
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: "ix-exporter"
+  namespace: "kube-system"
   labels:
     app.kubernetes.io/name: "ix-exporter"
 spec:
@@ -32,8 +82,9 @@ spec:
         app.kubernetes.io/name: "ix-exporter"
       name: "ix-exporter"
     spec:
+      serviceAccountName: ix-exporter
       containers:
-      - image: "iluvatarcorex/ix-exporter:3.1.1"
+      - image: "ix-exporter:4.2.0-x86_64"
         name: "ix-exporter"
         ports:
         - name: "metrics"
@@ -46,22 +97,39 @@ spec:
         - name: "pod-resources"
           readOnly: true
           mountPath: "/var/lib/kubelet/pod-resources"
+        - name: "split-board"
+          readOnly: true
+          mountPath: "/iluvatar-config"
+        - name: "host-proc"
+          mountPath: /host-proc
+          readOnly: true
+          mountPropagation: HostToContainer
       volumes:
+      - name: "split-board"
+        configMap:
+          name: "ix-config"
+      - name: "host-proc"
+        hostPath:
+          path: "/proc"
       - name: "pod-resources"
         hostPath:
           path: "/var/lib/kubelet/pod-resources"
 
 ---
-
 kind: Service
 apiVersion: v1
 metadata:
   name: "ix-exporter"
+  namespace: "kube-system"
   labels:
     app.kubernetes.io/name: "ix-exporter"
 spec:
   selector:
     app.kubernetes.io/name: "ix-exporter"
+  type: NodePort    
   ports:
   - name: "metrics"
     port: 32021
+    targetPort: 32021
+    nodePort: 32021
+

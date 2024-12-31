@@ -13,15 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-GO := go
-DOCKER := docker
-
-VERSION := 1.0.0
 TARGET := ix-exporter
+VERSION ?= 4.2.0
 
-COREX_PATH := /usr/local/corex
+MODULE := gitee.com/deep-spark/ixexporter
+DOCKER ?= docker
+
+ifeq ($(REGISTRY),)
+IMAGE_NAME = ix-exporter:$(VERSION)-x86_64
+else 
+IMAGE_NAME = $(REGISTRY)/ix-exporter:$(VERSION)-x86_64
+endif
+
+GOOS := linux
 
 BUILD_DIR := build
+COREX_PATH := /usr/local/corex
 
 DEPENDS := libixml.so \
            libcuda.so \
@@ -31,28 +38,25 @@ DEPENDS := libixml.so \
            libcudart.so.10.2.89 \
            libixthunk.so
 
-IMG_NAME := ix-exporter:$(VERSION)
-
 .PHONY: all
-all: image
+all: build image
 
-.PHONY: exporter
-exporter:
-	CGO_CFLAGS=-I${COREX}/include \
-	go build -o ${BUILD_DIR}/${TARGET}
+.PHONY: build
+build:
+	CGO_CFLAGS=-I${COREX_PATH}/include \
+	GOOS=$(GOOS) go build -ldflags "-s -w" \
+	    -o $(BUILD_DIR)/$(TARGET) $(MODULE)/cmd/$(TARGET)
 
-.PNONY: image
+.PHONY: image
 image:
 	mkdir -p $(BUILD_DIR)/lib64
 	$(foreach lib, $(DEPENDS), cp -P $(COREX_PATH)/lib64/$(lib) $(BUILD_DIR)/lib64;)
 	$(DOCKER) build \
-	        -t $(IMG_NAME) \
+	        -t $(IMAGE_NAME) \
 	        --build-arg EXEC=$(BUILD_DIR)/$(TARGET) \
-	        --build-arg LIB_DIR=$(BUILD_DIR)/lib64 \
-	        --build-arg CONFIG=ix-exporter.yaml \
-	        -f docker/Dockerfile \
-	        .
+			--build-arg LIB_DIR=$(BUILD_DIR)/lib64 \
+	        -f Dockerfile \
+			.
 
-.PHONY: clean
 clean:
-	rm -rf ${BUILD_DIR}
+	rm -rf $(BUILD_DIR)
