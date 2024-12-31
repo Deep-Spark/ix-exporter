@@ -1,6 +1,6 @@
-# IX-Expoter
+# IX-Exporter
 
-ix-expoter is a http server to expose Iluvatar GPU node information.
+ix-exporter is an HTTP server to expose Iluvatar GPU node information.
 
 ## Build binary and image
 
