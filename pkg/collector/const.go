@@ -17,24 +17,37 @@ limitations under the License.
 
 package collector
 
+import "time"
+
 const (
 	Iluvatar = "iluvatar"
 
-	Temperature     = "ix_temperature"
-	FanSpeed        = "ix_fan_speed"
-	SmClock         = "ix_sm_clock"
-	MemClock        = "ix_mem_clock"
-	MemTotal        = "ix_mem_total"
-	MemUsed         = "ix_mem_used"
-	MemFree         = "ix_mem_free"
-	MemUtilization  = "ix_mem_utilization"
-	GpuUtilization  = "ix_gpu_utilization"
-	PowerUsage      = "ix_power_usage"
-	ProcessInfo     = "ix_process_info"
-	XidErrors       = "ix_xid_errors"
-	EccSbeVolStatus = "ix_ecc_sbe_vol_status"
-	EccDbeVolStatus = "ix_ecc_dbe_vol_status"
-	SmUtilization   = "ix_sm_utilization"
+	IxTemperature       = "ix_temperature"
+	IxFanSpeed          = "ix_fan_speed"
+	IxSmClock           = "ix_sm_clock"
+	IxMemClock          = "ix_mem_clock"
+	IxMemTotal          = "ix_mem_total"
+	IxMemUsed           = "ix_mem_used"
+	IxMemFree           = "ix_mem_free"
+	IxMemUtilization    = "ix_mem_utilization"
+	IxGpuUtilization    = "ix_gpu_utilization"
+	IxPowerUsage        = "ix_power_usage"
+	IxProcessInfo       = "ix_process_info"
+	IxXidErrors         = "ix_xid_errors"
+	IxEccSbeVolStatus   = "ix_ecc_sbe_vol_status"
+	IxEccDbeVolStatus   = "ix_ecc_dbe_vol_status"
+	IxSmUtilization     = "ix_sm_utilization"
+	IxSmOccupancy       = "ix_sm_occupancy"
+	IxDrawBwUtilization = "ix_dram_bw_util"
+	IxPcieRxThroughput  = "ix_pcie_rx_throughput"
+	IxPcieTxThroughput  = "ix_pcie_tx_throughput"
+	IxPcieReplayCounter = "ix_pcie_replay_counter"
+)
+
+const (
+	CollectWaitTime    = 10 * time.Second
+	CacheExpiryTime    = 2 * time.Second
+	KubeletConnTimeout = 5 * time.Second
 )
 
 const (

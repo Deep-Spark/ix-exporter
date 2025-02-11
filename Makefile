@@ -31,6 +31,7 @@ BUILD_DIR := build
 COREX_PATH := /usr/local/corex
 
 DEPENDS := libixml.so \
+           libixdcgm.so \
            libcuda.so \
            libcuda.so.1 \
            libcudart.so \
@@ -43,12 +44,12 @@ all: build image
 
 .PHONY: build
 build:
-	CGO_CFLAGS=-I${COREX_PATH}/include \
-	GOOS=$(GOOS) go build -ldflags "-s -w" \
+	CGO_CFLAGS=-I${COREX_PATH}/include GOOS=$(GOOS) CGO_ENABLED=1 \
+	go build -ldflags "-s -w" \
 	    -o $(BUILD_DIR)/$(TARGET) $(MODULE)/cmd/$(TARGET)
 
 .PHONY: image
-image:
+image: build
 	mkdir -p $(BUILD_DIR)/lib64
 	$(foreach lib, $(DEPENDS), cp -P $(COREX_PATH)/lib64/$(lib) $(BUILD_DIR)/lib64;)
 	$(DOCKER) build \
@@ -60,3 +61,19 @@ image:
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+# Apply go tools to the codebase
+GO_TARGETS := fmt vet vendor
+.PHONY: $(GO_TARGETS)
+
+vendor:
+	go mod tidy
+	go mod vendor
+	go mod verify
+
+fmt: vendor
+	go fmt $(MODULE)/...
+
+vet: vendor
+	go vet $(MODULE)/...
+		

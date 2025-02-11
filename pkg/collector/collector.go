@@ -31,167 +31,30 @@ type subCollector interface {
 	collect(ctx *ixContext)
 }
 
-type iluvatarCollector struct {
-	opts            *Options
-	collectorConfig []collectorConfig
-	resources       map[string]*prometheus.Desc
-	gpus            iluvatarGPU
-	labels          []string
-	ctx             *ixContext
+// IXCollector implements the Collector interface.
+type IXCollector struct {
+	opts       *Options
+	resources  map[string]*prometheus.Desc
+	sysinfo    SysInfo
+	cfgMetrics []config.MetricItem
+	cfgLabels  []string
+	ctx        *ixContext
 }
 
-func initIXMLAndCheckDrivers(info *iluvatarGPU) error {
-	var ret ixml.Return
-
-	ret = ixml.Init()
-	if ret != ixml.SUCCESS {
-		logger.IluvatarLog.Logger.Errorf("Unable to initialize IXML: %v", ret)
-		return fmt.Errorf("unable to initialize IXML: %v", ret)
-	}
-
-	info.count, ret = ixml.DeviceGetCount()
-	if ret != ixml.SUCCESS {
-		logger.IluvatarLog.Logger.Errorln("Unable to get device count: %v", ret)
-		return fmt.Errorf("Unable to get device count: %v", ret)
-	}
-
-	info.driverVersion, ret = ixml.SystemGetDriverVersion()
-	if ret != ixml.SUCCESS {
-		logger.IluvatarLog.Logger.Warningf("Unable to get driver version: %v", ret)
-	}
-
-	info.cudaVersion, ret = ixml.SystemGetCudaDriverVersion()
-	if ret != ixml.SUCCESS {
-		logger.IluvatarLog.Logger.Warningf("Unable to get cuda driver version: %v", ret)
-	}
-	return nil
-}
-
-func processDeviceAtIndex(info *iluvatarGPU, index uint, chipList []chip, chipmap map[chip]bool) error {
-	var device ixml.Device
-	gpu := gpuInfo{
-		index: index,
-	}
-
-	ret := ixml.DeviceGetHandleByIndex(index, &device)
-	if ret != ixml.SUCCESS {
-		logger.IluvatarLog.Logger.Errorf("Unable to get device at index %d: %v", index, ret)
-		return fmt.Errorf("Unable to get device at index %d: %v", index, ret)
-	}
-
-	gpu.name, ret = device.GetName()
-	if ret != ixml.SUCCESS {
-		logger.IluvatarLog.Logger.Warningf("Unable to get name %v", ret)
-	}
-
-	uuid, ret := device.GetUUID()
-	if ret != ixml.SUCCESS {
-		logger.IluvatarLog.Logger.Warningf("Unable to get device uuid %v", ret)
-	}
-
-	pos, ret := device.GetBoardPosition()
-	if ret != ixml.SUCCESS {
-		if ret == ixml.ERROR_NOT_SUPPORTED {
-			logger.IluvatarLog.Logger.Infof("GPU %s not support splitboard.\n", gpu.name)
-			info.pairChips[uuid] = uuid
-		} else {
-			logger.IluvatarLog.Logger.Warningf("Unable to get BoardPosition %v", ret)
-		}
-	} else {
-		logger.IluvatarLog.Logger.Infof("GPU %s on board %d.\n", gpu.name, pos)
-		key := chip{
-			uuid:      uuid,
-			operation: device,
-		}
-
-		chipmap[key] = false
-		chipList = append(chipList, key)
-	}
-
-	info.gpus[uuid] = gpu
-	return nil
-}
-
-func collectChipData(info *iluvatarGPU, chipmap map[chip]bool) []chip {
-	var chipList []chip
-
-	for index := uint(0); index < info.count; index++ {
-		if err := processDeviceAtIndex(info, index, chipList, chipmap); err != nil {
-			break
-		}
-	}
-
-	return chipList
-}
-
-func getDeviceInfo() iluvatarGPU {
-	var info iluvatarGPU
-	info.pairChips = make(map[string]string)
-	chipmap := make(map[chip]bool)
-	info.gpus = make(map[string]gpuInfo)
-
-	if err := initIXMLAndCheckDrivers(&info); err != nil {
-		return info
-	}
-
-	chipList := collectChipData(&info, chipmap)
-	if len(chipList) == 0 {
-		logger.IluvatarLog.Logger.Errorf("No chips detected")
-		return info
-	}
-	for i, first := range chipList {
-		if chipmap[first] {
-			continue
-		}
-		for j := i + 1; j < len(chipList); j++ {
-			second := chipList[j]
-			onSameBoard, ret := ixml.GetOnSameBoard(first.operation, chipList[j].operation)
-			if ret != ixml.SUCCESS {
-				if ret == ixml.ERROR_NOT_SUPPORTED {
-					logger.IluvatarLog.Logger.Warningf("GetOnSameBoard: Not supported\n")
-				} else {
-					logger.IluvatarLog.Logger.Errorf("Unable to get OnSameBoard %v", ret)
-				}
-				continue
-			}
-			if onSameBoard == 1 {
-				chipmap[first] = true
-				chipmap[second] = true
-				info.pairChips[first.uuid] = second.uuid
-				info.pairChips[second.uuid] = first.uuid
-				break
-			}
-		}
-	}
-
-	return info
-}
-
-func getMetricConfig(mcs config.ExporterConfig) []collectorConfig {
-	m := make([]collectorConfig, len(mcs.Metrics))
-	for i, mc := range mcs.Metrics {
-		m[i].Name = mc.Name
-		m[i].Help = mc.Help
-	}
-	return m
-}
-
-func NewIluvatarCollector(opts *Options) (*iluvatarCollector, error) {
-
-	cfg := config.Config{
+func NewIXCollector(opts *Options) (*IXCollector, error) {
+	cfg := config.MetricConfig{
 		ConfigFile: opts.MetricsConfig,
-		IxExporter: make(map[string]config.ExporterConfig),
+		MetricsMap: make(map[string]config.MetricItemList),
 	}
-	if err := cfg.ParseConfig(); err != nil {
-		logger.IluvatarLog.Errorf("Error parsing config: %s", err)
+	if err := cfg.ParseMetricConfig(); err != nil {
+		logger.IXLog.Errorf("Error parsing config: %s", err)
 		return nil, err
 	}
-	iluvatarConfig, ok := cfg.IxExporter[Iluvatar]
+	ixMetrics, ok := cfg.MetricsMap[Iluvatar]
 	if !ok {
-		logger.IluvatarLog.Errorf("Iluvatar configuration not found")
+		logger.IXLog.Errorf("Iluvatar configuration not found")
 		return nil, fmt.Errorf("iluvatar configuration not found")
 	}
-	ml := getMetricConfig(iluvatarConfig)
 
 	var labels []string
 	if opts.EnableKube {
@@ -200,89 +63,197 @@ func NewIluvatarCollector(opts *Options) (*iluvatarCollector, error) {
 		labels = LabelList
 	}
 
-	return &iluvatarCollector{
-		opts:            opts,
-		gpus:            getDeviceInfo(),
-		resources:       make(map[string]*prometheus.Desc),
-		collectorConfig: ml,
-		labels:          labels,
-		ctx:             nil,
+	return &IXCollector{
+		opts:       opts,
+		sysinfo:    getDeviceInfo(),
+		resources:  make(map[string]*prometheus.Desc),
+		cfgMetrics: ixMetrics.Metrics,
+		cfgLabels:  labels,
+		ctx:        nil,
 	}, nil
 }
 
 // Describe is the implementation of the interface of 'prometheus.Collecter.Describe()', once
 // 'prometheus.MustRegtister()' or 'prometheus.Unregister()' was called, it will be triggered.
-func (ic *iluvatarCollector) Describe(ch chan<- *prometheus.Desc) {
+func (ic *IXCollector) Describe(ch chan<- *prometheus.Desc) {
+	logger.IXLog.Info("Describe() called ...")
 
-	logger.IluvatarLog.Info("Describe() called...")
 	if ic.ctx == nil {
 		ic.ctx = newContext()
-		registerGpuCollector(ic.ctx, ic.collectorConfig, ic.gpus)
-		if ic.opts.EnableKube {
-			registerKubeCollector(ic.ctx, ic.gpus)
-		}
-		for _, mc := range ic.collectorConfig {
+		InitGpuCollector(ic)
+		InitKubeCollector(ic)
+
+		for _, mc := range ic.cfgMetrics {
 			var labelsForDesc []string
-			if mc.Name == ProcessInfo {
-				labelsForDesc = append(labelsForDesc, ic.labels...)
+			if mc.Name == IxProcessInfo {
+				labelsForDesc = append(labelsForDesc, ic.cfgLabels...)
 				labelsForDesc = append(labelsForDesc, LabelProcessPid)
 				labelsForDesc = append(labelsForDesc, LabelProcessName)
 			} else {
-				labelsForDesc = ic.labels
+				labelsForDesc = ic.cfgLabels
 			}
 			desc := prometheus.NewDesc(mc.Name, mc.Help, labelsForDesc, nil)
 			ic.resources[mc.Name] = desc
 			ch <- desc
-
-			logger.IluvatarLog.Infof("Register gpu resource '%s'", mc.Name)
+			logger.IXLog.Infof("Register gpu resource '%s' to prometheus.", mc.Name)
 		}
 	} else {
 		ic.ctx.cancel()
 		ic.ctx = nil
-		for key, _ := range ic.resources {
+		for key := range ic.resources {
 			delete(ic.resources, key)
-			logger.IluvatarLog.Infof("Unregister gpu resource '%s'", string(key))
 		}
 	}
 }
 
 // Collect is the implementation of the interface of 'prometheus.Collector.Collect()', once
 // there is a request from client, it will be triggered, then collect the metrics.
-func (ic *iluvatarCollector) Collect(ch chan<- prometheus.Metric) {
-	logger.IluvatarLog.Info("Collect() called...")
-	collectMetrics := func(ch chan<- prometheus.Metric) {
-		metrics := ic.ctx.getMetrics()
-		for _, ms := range metrics {
-			for _, m := range ms {
-				labelForValues := make([]string, len(ic.labels))
-				for i, label := range ic.labels {
-					labelForValues[i] = m.labels[label]
+func (ic *IXCollector) Collect(ch chan<- prometheus.Metric) {
+	logger.IXLog.Info("Collect() called...")
+
+	start := time.Now()
+
+	metricss := ic.ctx.getMetrics()
+	for _, ms := range metricss {
+		for _, m := range ms {
+			labelForValues := make([]string, len(ic.cfgLabels))
+			for i, label := range ic.cfgLabels {
+				labelForValues[i] = m.labels[label]
+			}
+			if m.name == IxProcessInfo {
+				labelForValues = append(labelForValues, m.labels[LabelProcessPid])
+				labelForValues = append(labelForValues, m.labels[LabelProcessName])
+			}
+			if desc, ok := ic.resources[m.name]; ok {
+				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, m.value, labelForValues...)
+			}
+		}
+	}
+	logger.IXLog.Infof("Collect metrics took %v", time.Since(start))
+}
+
+func collectDriverVers(info *SysInfo) error {
+	var ret ixml.Return
+
+	info.GPUCount, ret = ixml.DeviceGetCount()
+	if ret != ixml.SUCCESS {
+		logger.IXLog.Errorf("Unable to get device count: %v", ret)
+		return fmt.Errorf("unable to get device count: %v", ret)
+	}
+
+	info.driverVersion, ret = ixml.SystemGetDriverVersion()
+	if ret != ixml.SUCCESS {
+		logger.IXLog.Warningf("Unable to get driver version: %v", ret)
+	}
+
+	info.cudaVersion, ret = ixml.SystemGetCudaDriverVersion()
+	if ret != ixml.SUCCESS {
+		logger.IXLog.Warningf("Unable to get cuda driver version: %v", ret)
+	}
+	return nil
+}
+
+func processDeviceAtIndex(info *SysInfo, index uint, boardChips *[]chip) error {
+	var device ixml.Device
+	gpu := GpuInfo{
+		index: index,
+	}
+
+	ret := ixml.DeviceGetHandleByIndex(index, &device)
+	if ret != ixml.SUCCESS {
+		logger.IXLog.Errorf("Unable to get device at index %d: %v", index, ret)
+		return fmt.Errorf("unable to get device at index %d: %v", index, ret)
+	}
+
+	gpu.name, ret = device.GetName()
+	if ret != ixml.SUCCESS {
+		logger.IXLog.Warningf("Unable to get name %v", ret)
+	}
+
+	uuid, ret := device.GetUUID()
+	if ret != ixml.SUCCESS {
+		logger.IXLog.Warningf("Unable to get device uuid %v", ret)
+	}
+	gpu.uuid = uuid
+
+	pos, ret := device.GetBoardPosition()
+	if ret != ixml.SUCCESS {
+		if ret == ixml.ERROR_NOT_SUPPORTED {
+			logger.IXLog.Infof("GPU %s not support splitboard.", gpu.name)
+			info.pairChips[uuid] = uuid
+		} else {
+			logger.IXLog.Warningf("Unable to get BoardPosition %v", ret)
+		}
+	} else {
+		logger.IXLog.Infof("GPU %s on board %d.", gpu.name, pos)
+		key := chip{
+			uuid:      uuid,
+			operation: device,
+		}
+
+		*boardChips = append(*boardChips, key)
+	}
+
+	info.GPUs[uuid] = gpu
+	return nil
+}
+
+func collectChipData(info *SysInfo) []chip {
+	var boardChips []chip
+
+	for index := uint(0); index < info.GPUCount; index++ {
+		if err := processDeviceAtIndex(info, index, &boardChips); err != nil {
+			break
+		}
+	}
+
+	return boardChips
+}
+
+func getDeviceInfo() SysInfo {
+	var info SysInfo
+	info.pairChips = make(map[string]string)
+	info.GPUs = make(map[string]GpuInfo)
+
+	if err := collectDriverVers(&info); err != nil {
+		return info
+	}
+
+	boardChips := collectChipData(&info)
+	if len(boardChips) == 0 {
+		logger.IXLog.Warningln("No chip support splitboard.")
+		return info
+	}
+
+	chipmap := make(map[string]bool, len(boardChips))
+	for _, bc := range boardChips {
+		chipmap[bc.uuid] = false
+	}
+
+	for i, first := range boardChips {
+		if chipmap[first.uuid] {
+			continue
+		}
+		for j := i + 1; j < len(boardChips); j++ {
+			second := boardChips[j]
+			onSameBoard, ret := ixml.GetOnSameBoard(first.operation, boardChips[j].operation)
+			if ret != ixml.SUCCESS {
+				if ret == ixml.ERROR_NOT_SUPPORTED {
+					logger.IXLog.Warningf("GetOnSameBoard: Not supported\n")
+				} else {
+					logger.IXLog.Errorf("Unable to get OnSameBoard %v", ret)
 				}
-				if m.name == ProcessInfo {
-					labelForValues = append(labelForValues, m.labels[LabelProcessPid])
-					labelForValues = append(labelForValues, m.labels[LabelProcessName])
-				}
-				if desc, ok := ic.resources[m.name]; ok {
-					ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, m.value, labelForValues...)
-				}
+				continue
+			}
+			if onSameBoard == 1 {
+				chipmap[first.uuid] = true
+				chipmap[second.uuid] = true
+				info.pairChips[first.uuid] = second.uuid
+				info.pairChips[second.uuid] = first.uuid
+				break
 			}
 		}
 	}
 
-	start := time.Now()
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		collectMetrics(ch)
-	}()
-
-	select {
-	case <-time.After(25 * time.Second):
-		logger.IluvatarLog.Errorf("Collect metrics timeout")
-		return
-	case <-done:
-		logger.IluvatarLog.Infof("Task completed within the timeout period.")
-	}
-
-	logger.IluvatarLog.Infof("Collect metrics took %v", time.Since(start))
+	return info
 }

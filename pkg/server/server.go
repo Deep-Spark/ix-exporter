@@ -60,7 +60,7 @@ func NewMetricsServer(opts *collector.Options, reg *prometheus.Registry) *Metric
 				</html>
 			`))
 			if err != nil {
-				logger.IluvatarLog.Errorf("Write response error: %v", err)
+				logger.IXLog.Errorf("Write response error: %v", err)
 			}
 		},
 	))
@@ -75,10 +75,10 @@ func NewMetricsServer(opts *collector.Options, reg *prometheus.Registry) *Metric
 }
 
 func (ms *MetricsServer) Run(ctx context.Context, cancel context.CancelFunc) {
-	logger.IluvatarLog.Infof("Metrics server is running on %s", ms.server.Addr)
+	logger.IXLog.Infof("Metrics server is running on %s", ms.server.Addr)
 	go func() {
 		if err := ms.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.IluvatarLog.Errorf("Metrics server error: %v", err)
+			logger.IXLog.Errorf("Metrics server error: %v", err)
 			cancel()
 		}
 	}()
@@ -90,12 +90,12 @@ func (ms *MetricsServer) Run(ctx context.Context, cancel context.CancelFunc) {
 }
 
 func (ms *MetricsServer) serverShutdown() {
-	logger.IluvatarLog.Infof("Metrics server is shutting down")
+	logger.IXLog.Infof("Metrics server is shutting down")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	if err := ms.server.Shutdown(ctx); err != nil {
-		logger.IluvatarLog.Errorf("Metrics server shutdown error: %v", err)
+		logger.IXLog.Errorf("Metrics server shutdown error: %v", err)
 	} else {
-		logger.IluvatarLog.Infof("Metrics server stopped")
+		logger.IXLog.Infof("Metrics server stopped")
 	}
 }

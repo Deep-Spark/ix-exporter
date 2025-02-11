@@ -20,8 +20,16 @@ package utils
 import (
 	"bufio"
 	"os"
+	"reflect"
+	"regexp"
+	"runtime"
 	"strings"
+	"time"
+
+	"gitee.com/deep-spark/ixexporter/pkg/logger"
 )
+
+var devIdRegex = regexp.MustCompile(`(::\d+)$`)
 
 func CheckFileExists(path string) (bool, error) {
 	if path == "" {
@@ -40,11 +48,7 @@ func CheckFileExists(path string) (bool, error) {
 
 func ValidatePath(path string) bool {
 	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		return false
-	}
-
-	return true
+	return !os.IsNotExist(err)
 }
 
 func IsDocker() bool {
@@ -62,4 +66,20 @@ func IsDocker() bool {
 		}
 	}
 	return false
+}
+
+func RemoveDeviceIduffix(s string) string {
+	return devIdRegex.ReplaceAllString(s, "")
+}
+
+func GetFuncName(itf interface{}) string {
+	strs := strings.Split((runtime.FuncForPC(reflect.ValueOf(itf).Pointer()).Name()), ".")
+	return strs[len(strs)-1]
+}
+
+func DebugTrace() {
+	for {
+		logger.IXLog.Tracef("Current num of routines is %d", runtime.NumGoroutine())
+		time.Sleep(10 * time.Second)
+	}
 }

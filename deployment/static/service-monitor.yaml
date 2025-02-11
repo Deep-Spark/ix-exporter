@@ -1,0 +1,25 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/name: ix-exporter
+    app.kubernetes.io/part-of: kube-prometheus
+  name: ix-exporter
+  namespace: monitoring
+spec:
+  endpoints:
+    - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      interval: 30s
+      scrapeTimeout: 10s
+      port: metrics
+      scheme: http
+      path: /metrics
+      honorLabels: false # controls whether Prometheus preserves the metric's labels when they collide with the target's labels.
+      honorTimestamps: false # controls whether Prometheus preserves the timestamps when exposed by the target.
+  jobLabel: app.kubernetes.io/name
+  namespaceSelector:
+    matchNames:
+      - kube-system
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ix-exporter

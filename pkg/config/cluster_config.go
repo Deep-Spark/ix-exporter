@@ -20,9 +20,8 @@ package config
 import (
 	"fmt"
 	"io"
-	"regexp"
 
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 type Flags struct {
@@ -48,7 +47,7 @@ type ClusterConfig struct {
 	Sharing Sharing `json:"sharing,omitempty"   yaml:"sharing,omitempty"`
 }
 
-func ParseConfigFrom(reader io.Reader) (*ClusterConfig, error) {
+func ParseClusterConfig(reader io.Reader) (*ClusterConfig, error) {
 	var err error
 	var configYaml []byte
 
@@ -64,9 +63,4 @@ func ParseConfigFrom(reader io.Reader) (*ClusterConfig, error) {
 	}
 
 	return &ccfg, nil
-}
-
-func RemoveDeviceIduffix(s string) string {
-	re := regexp.MustCompile(`(::\d+)$`)
-	return re.ReplaceAllString(s, "")
 }
