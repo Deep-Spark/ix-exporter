@@ -28,51 +28,51 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-type MetricConfig struct {
+type MetricItem struct {
 	Name string `yaml:"name"`
 	Help string `yaml:"help"`
 }
 
-type ExporterConfig struct {
-	Metrics []MetricConfig `yaml:"metrics"`
+type MetricItemList struct {
+	Metrics []MetricItem `yaml:"metrics"`
 }
 
-type Config struct {
+type MetricConfig struct {
 	ConfigFile string
-	IxExporter map[string]ExporterConfig
+	MetricsMap map[string]MetricItemList
 }
 
-func (c *Config) ParseConfig() error {
+func (c *MetricConfig) ParseMetricConfig() error {
 	exists, err := utils.CheckFileExists(c.ConfigFile)
 	if err != nil {
 		return err
 	}
 	if !exists {
-		logger.IluvatarLog.Errorf("file not found: %s", c.ConfigFile)
+		logger.IXLog.Errorf("config file not found: %s", c.ConfigFile)
 		return err
 	}
 
 	data, err := os.ReadFile(c.ConfigFile)
 	if err != nil {
-		logger.IluvatarLog.Errorf("fail to open file: %s", c.ConfigFile)
+		logger.IXLog.Errorf("fail to read data from config file: %s", c.ConfigFile)
 		return err
 	}
 
-	if err = yaml.Unmarshal(data, c.IxExporter); err != nil {
-		logger.IluvatarLog.Errorf("fail to parse config file: %s", c.ConfigFile)
+	if err = yaml.Unmarshal(data, c.MetricsMap); err != nil {
+		logger.IXLog.Errorln("fail to parse config data.")
 		return err
 	}
 
-	if err = c.verifyIxExporterConfig(); err != nil {
-		logger.IluvatarLog.Errorf("verify config failed: %s", c.ConfigFile)
+	if err = c.verifyConfig(); err != nil {
+		logger.IXLog.Errorln("fail to verify config.")
 		return err
 	}
 
 	return nil
 }
 
-func (c *Config) verifyIxExporterConfig() error {
-	for k, v := range c.IxExporter {
+func (c *MetricConfig) verifyConfig() error {
+	for k, v := range c.MetricsMap {
 		if k == "" || len(v.Metrics) == 0 {
 			return errors.New("miss field 'name' or 'metrics' in config file")
 		}

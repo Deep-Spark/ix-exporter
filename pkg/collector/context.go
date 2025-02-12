@@ -19,7 +19,9 @@ package collector
 
 import (
 	"context"
+	"os"
 	"sync"
+	"time"
 
 	"gitee.com/deep-spark/ixexporter/pkg/logger"
 )
@@ -30,18 +32,45 @@ type ixContext struct {
 	cancelFunc  context.CancelFunc
 	signalCh    chan struct{}
 	collectors  []subCollector
-	metrics     map[string][]metric
-	labelValues map[string]labelType
-	mutex       sync.Mutex
+	metricss    MetricsMap
+	labelValues map[string]LabelsMap
+	nodeName    string
+
+	mutex         sync.Mutex
+	procNum       int
+	procStartFlag bool
+	procEndFlag   bool
+	procEndTime   time.Time
+	metricColCh   chan struct{} // singal of collect metrics
+	metricUptCh   chan struct{} // singal of update metrics
 }
 
 func newContext() *ixContext {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	nodeName := os.Getenv("NODE_NAME")
+	if nodeName == "" {
+		logger.IXLog.Warningf("NODE_NAME was not set in env, get nodeName from hostname.")
+		nn, err := os.Hostname()
+		if err != nil {
+			logger.IXLog.Panicf("Error to get hostname from os.")
+		}
+		nodeName = nn
+	}
+
 	return &ixContext{
 		ctx:        ctx,
 		cancelFunc: cancel,
-		metrics:    make(map[string][]metric),
+		signalCh:   make(chan struct{}),
+		metricss:   make(MetricsMap),
+		nodeName:   nodeName,
+
+		procNum:       0,
+		procStartFlag: false,
+		procEndFlag:   true,
+		procEndTime:   time.Now().Add(-CacheExpiryTime),
+		metricColCh:   make(chan struct{}),
+		metricUptCh:   make(chan struct{}),
 	}
 }
 
@@ -53,66 +82,110 @@ func (ctx *ixContext) done() <-chan struct{} {
 	return ctx.ctx.Done()
 }
 
-func (ctx *ixContext) signal() <-chan struct{} {
-	ctx.mutex.Lock()
-	if ctx.signalCh == nil {
-		ctx.signalCh = make(chan struct{})
-	}
-	ctx.mutex.Unlock()
-
-	return ctx.signalCh
-}
-
 func (ctx *ixContext) registerCollector(collector subCollector) {
 	ctx.collectors = append(ctx.collectors, collector)
 }
 
-func (ctx *ixContext) getMetrics() map[string][]metric {
+func (ctx *ixContext) initStat() {
+	ctx.mutex.Lock()
+	defer ctx.mutex.Unlock()
+
 	// Notify all collectors to update metrics.
-	if ctx.signalCh != nil {
-		close(ctx.signalCh)
-		ctx.signalCh = nil
-	}
+	close(ctx.signalCh)
+	ctx.signalCh = make(chan struct{})
 
-	for uuid, ms := range ctx.metrics {
-		updateMetrics := []metric{}
-
-		for _, metric := range ms {
-			if labels, ok := ctx.labelValues[uuid]; ok {
-				for key, value := range labels {
-					metric.labels[key] = value
-				}
-			}
-			updateMetrics = append(updateMetrics, metric)
-		}
-		ctx.metrics[uuid] = updateMetrics
-	}
-
-	return ctx.metrics
+	ctx.procNum = 0
+	ctx.metricColCh = make(chan struct{})
+	ctx.procStartFlag = true
+	ctx.procEndFlag = false
 }
 
-func (ctx *ixContext) updateMetrics(metrics interface{}) {
-	// Wait until metrics updated.
-	logger.IluvatarLog.Logger.Infof("Start Update metrics...")
+func (ctx *ixContext) updateStat() {
+	ctx.mutex.Lock()
+	defer ctx.mutex.Unlock()
 
-	// Store metrics.
-	switch metrics := metrics.(type) {
-	case map[string][]metric:
-		updateMetrics := make(map[string][]metric)
-		for uuid, ms := range metrics {
-			var ms_ []metric
-			for _, m := range ms {
-				for _, key := range ctx.labels {
-					if _, ok := m.labels[key]; !ok {
-						m.labels[key] = ""
+	ctx.procNum++
+	if ctx.procNum == len(ctx.collectors) {
+		close(ctx.metricColCh)
+	}
+}
+
+func (ctx *ixContext) endStat() {
+	ctx.mutex.Lock()
+	defer ctx.mutex.Unlock()
+
+	ctx.procEndTime = time.Now()
+	ctx.procStartFlag = false
+	ctx.procEndFlag = true
+}
+
+func (ctx *ixContext) getCachedMetrics() bool {
+	if ctx.procEndFlag {
+		now := time.Now()
+		if now.Before(ctx.procEndTime.Add(CacheExpiryTime)) {
+			logger.IXLog.Infoln("last collect process is finished and cached is fresh, return the cached metrics.")
+			return true
+		} else {
+			logger.IXLog.Infoln("last collect process is finished but cached is stale, start to collect new metrics.")
+			return false
+		}
+	} else if ctx.procStartFlag {
+		logger.IXLog.Infoln("collect process is running, wait and return the collected metrics.")
+		select {
+		case <-time.After(CollectWaitTime):
+			logger.IXLog.Errorln("collect process is timeout, start to collect new metrics.")
+			return false
+		case <-ctx.metricUptCh: // Wait until metrics updated.
+			return true
+		}
+	}
+
+	return false
+}
+
+func (ctx *ixContext) getMetrics() MetricsMap {
+	if ok := ctx.getCachedMetrics(); ok {
+		return ctx.metricss
+	}
+
+	ctx.initStat()
+	ctx.metricUptCh = make(chan struct{})
+	defer close(ctx.metricUptCh)
+
+	select {
+	case <-time.After(CollectWaitTime):
+		logger.IXLog.Errorln("not all of metrics are updated within timeout peroid.")
+	case <-ctx.metricColCh: // Wait all metrics are updated.
+		for uuid, ms := range ctx.metricss {
+			updateMetrics := []*Metric{}
+			for _, metric := range ms {
+				if labels, ok := ctx.labelValues[uuid]; ok {
+					for key, value := range labels {
+						metric.labels[key] = value
 					}
 				}
-				ms_ = append(ms_, m)
+				updateMetrics = append(updateMetrics, metric)
 			}
-			updateMetrics[uuid] = ms_
+			ctx.metricss[uuid] = updateMetrics
 		}
-		ctx.metrics = updateMetrics
-	case map[string]labelType:
-		ctx.labelValues = metrics
+		logger.IXLog.Infoln("All of metrics are updated.")
+		ctx.endStat()
+	}
+
+	return ctx.metricss
+}
+
+func (ctx *ixContext) storeMetrics(metrics MetricsMap) {
+	for uuid, ms := range metrics {
+		var metrics []*Metric
+		for _, m := range ms {
+			for _, key := range ctx.labels {
+				if _, ok := m.labels[key]; !ok {
+					m.labels[key] = ""
+				}
+			}
+			metrics = append(metrics, m)
+		}
+		ctx.metricss[uuid] = metrics
 	}
 }

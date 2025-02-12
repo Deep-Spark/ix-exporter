@@ -18,19 +18,27 @@ limitations under the License.
 package logger
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/sirupsen/logrus"
-	"github.com/tsaikd/KDGoLib/logrusutil"
 	"gopkg.in/natefinch/lumberjack.v2" // Logrotate
 )
 
-var IluvatarLog *LoggerWrapper
+var IXLog *LoggerWrapper
+var logLevels = [...]string{"PANIC", "FATAL", "ERROR", "WARN", "INFO", "DEBUG", "TRACE"}
 
-func InitIluvatarLog(fileName string, logLevel int64) error {
-	IluvatarLog = NewIluvatarLog()
-	err := IluvatarLog.UpdateConfig(fileName, logLevel)
+func init() {
+	IXLog = &LoggerWrapper{
+		Logger: logrus.New(),
+	}
+}
+
+func InitIXLog(fileName string, logLevel int) error {
+	err := IXLog.UpdateConfig(fileName, logLevel)
 	if err != nil {
 		return err
 	}
@@ -39,49 +47,64 @@ func InitIluvatarLog(fileName string, logLevel int64) error {
 
 type LoggerWrapper struct {
 	*logrus.Logger
-	logFile *os.File
 }
 
-func NewIluvatarLog() *LoggerWrapper {
-	return &LoggerWrapper{
-		Logger: logrus.New(),
-	}
-}
-
-func (ixLog *LoggerWrapper) UpdateConfig(fileName string, logLevel int64) error {
+func (ixLog *LoggerWrapper) UpdateConfig(fileName string, logLevel int) error {
 
 	logWriter := &lumberjack.Logger{
 		Filename:   fileName,
-		MaxSize:    1024,
+		MaxSize:    100,
 		MaxBackups: 3,
 		MaxAge:     7,
 		Compress:   true,
 	}
 
-	ixLog.SetLogLevel(logLevel)
-
-	formatter := &logrusutil.ConsoleLogFormatter{
-		TimestampFormat: "2006/01/02 15:04:07",
-		Flag:            logrusutil.Llevel | logrusutil.Ltime | logrusutil.Lshortfile,
+	var entryLevels = []logrus.Level{
+		logrus.PanicLevel,
+		logrus.FatalLevel,
+		logrus.ErrorLevel,
+		logrus.DebugLevel,
+		logrus.InfoLevel,
+		logrus.DebugLevel,
+		logrus.TraceLevel,
 	}
-	ixLog.SetFormatter(formatter)
+	ixLog.Logger.SetLevel(entryLevels[logLevel])
 
+	// Log the messages to stdout as well as logWriter
 	ixLog.SetOutput(io.MultiWriter(os.Stdout, logWriter))
+
+	// Required to get line number
+	ixLog.SetReportCaller(true)
+
+	// Set custom formatter
+	ixLog.SetFormatter(&MyFormatter{})
 
 	return nil
 }
 
-func (ixLog *LoggerWrapper) SetLogLevel(logLevel int64) {
-	var level logrus.Level
-	switch logLevel {
-	case 0:
-		level = logrus.DebugLevel
-	case 1:
-		level = logrus.InfoLevel
-	case 2:
-		level = logrus.WarnLevel
-	default:
-		level = logrus.ErrorLevel
+type NullFormatter struct {
+}
+
+func (f *NullFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	return []byte(""), nil
+}
+
+type MyFormatter struct {
+}
+
+func (f *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	var b *bytes.Buffer
+	if entry.Buffer != nil {
+		b = entry.Buffer
+	} else {
+		b = &bytes.Buffer{}
 	}
-	ixLog.Logger.SetLevel(level)
+	level := logLevels[int(entry.Level)]
+	strList := strings.Split(entry.Caller.File, "/")
+	fileName := strList[len(strList)-1]
+
+	b.WriteString(fmt.Sprintf("%s %5s [%s:%d] - %s\n",
+		entry.Time.Format("2006/01/02 15:04:05.000"),
+		level, fileName, entry.Caller.Line, entry.Message))
+	return b.Bytes(), nil
 }

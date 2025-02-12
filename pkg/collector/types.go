@@ -22,52 +22,38 @@ import (
 )
 
 type Options struct {
-	Loglevel      int64
+	Loglevel      int
 	Logfile       string
 	IP            string
 	Port          string
 	MetricsConfig string
 	EnableKube    bool
+	UseRemoteHE   bool
+	RemoteHEInfo  string
 }
 
-type iluvatarGPU struct {
-	count         uint
+type SysInfo struct {
 	driverVersion string
 	cudaVersion   string
-	gpus          map[string]gpuInfo
-	pairChips     map[string]string
+	GPUCount      uint
+	GPUs          map[string]GpuInfo // key is gpu uuid
+	pairChips     map[string]string  // key is gpu uuid
 }
 
-type gpuInfo struct {
-	index             uint
-	name              string
-	temperature       float64
-	fanSpeed          float64
-	smClock           float64
-	memClock          float64
-	memoryTotal       float64
-	memoryUsed        float64
-	memoryFree        float64
-	memoryUtilization float64
-	gpuUtilization    float64
-	powerUsage        float64
-	pcieTxThroughput  float64
-	pcieRxThroughput  float64
-	pcieReplayCount   float64
+type GpuInfo struct {
+	index uint
+	uuid  string
+	name  string
 }
 
-type collectorConfig struct {
-	Name string
-	Help string
-}
-
-type metric struct {
+type Metric struct {
 	name   string
 	value  float64
-	labels map[string]string
+	labels LabelsMap
 }
 
-type labelType map[string]string
+type LabelsMap map[string]string // key is label name, vaule is label value
+type MetricsMap map[string][]*Metric
 
 type chip struct {
 	uuid      string
