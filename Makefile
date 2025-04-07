@@ -29,16 +29,17 @@ GOOS := linux
 
 BUILD_DIR := build
 COREX_PATH := /usr/local/corex
+COREX_LIBS := libixml.so \
+        	  libcuda.so \
+        	  libcuda.so.1 \
+        	  libcudart.so \
+        	  libcudart.so.10.2 \
+        	  libcudart.so.10.2.89 \
+        	  libixthunk.so
 
-DEPENDS := libixml.so \
-           libixdcgm.so \
-           libcuda.so \
-           libcuda.so.1 \
-           libcudart.so \
-           libcudart.so.10.2 \
-           libcudart.so.10.2.89 \
-           libixthunk.so
-
+IXDCGM_PATH := /usr/local/ixdcgm
+IXDCGM_LIBS := libixdcgm.so		   
+                                                                                                 
 .PHONY: all
 all: build image
 
@@ -49,9 +50,13 @@ build:
 	    -o $(BUILD_DIR)/$(TARGET) $(MODULE)/cmd/$(TARGET)
 
 .PHONY: image
-image: build
+image: clean build
 	mkdir -p $(BUILD_DIR)/lib64
-	$(foreach lib, $(DEPENDS), cp -P $(COREX_PATH)/lib64/$(lib) $(BUILD_DIR)/lib64;)
+	@$(foreach lib, $(COREX_LIBS), if [ ! -f $(COREX_PATH)/lib64/$(lib) ]; then echo "$(lib) not found"; exit 1; fi;)
+	$(foreach lib, $(COREX_LIBS), cp -P $(COREX_PATH)/lib64/$(lib) $(BUILD_DIR)/lib64;)
+	@$(foreach lib, $(IXDCGM_LIBS), if [ ! -f $(IXDCGM_PATH)/lib64/$(lib) ]; then echo "$(lib) not found"; exit 1; fi;)
+	$(foreach lib, $(IXDCGM_LIBS), cp -P $(IXDCGM_PATH)/lib64/$(lib)* $(BUILD_DIR)/lib64;)
+
 	$(DOCKER) build \
 	        -t $(IMAGE_NAME) \
 	        --build-arg EXEC=$(BUILD_DIR)/$(TARGET) \

@@ -13,73 +13,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: ix-exporter
-  namespace: "kube-system"
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: ix-exporter
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - pods
-      - nodes
-      - configmaps
-    verbs:
-      - get
-      - list
-      - watch
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: ix-exporter
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: ix-exporter
-subjects:
-  - kind: ServiceAccount
-    name: ix-exporter
-    namespace: "kube-system"
-
----
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: "ix-exporter"
-  namespace: "kube-system"
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: "ix-exporter"
+    app.kubernetes.io/name: {{ .Release.Name }}
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: "ix-exporter"
+      app.kubernetes.io/name: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: "ix-exporter"
-      name: "ix-exporter"
+        app.kubernetes.io/name: {{ .Release.Name }}
+      name: {{ .Release.Name }}
     spec:
       tolerations:
         - key: CriticalAddonsOnly
           operator: Exists
       priorityClassName: system-node-critical
-      serviceAccountName: ix-exporter
+      serviceAccountName: service-account-{{ .Release.Name }}
       containers:
-        - image: "ix-exporter:4.2.0-x86_64"
-          name: "ix-exporter"
+        - image: {{ .Values.image }}
+          name: {{ .Release.Name }}
           args:
-            - --log-level=4
+            - --log-level={{ .Values.daemonset.logLevel }}
+            - --log-file={{ .Values.daemonset.logFile }}
+            - --ip={{ .Values.service.ip }}
             - --enable-kubernetes=true
-            - --ip=0.0.0.0
           securityContext:
             privileged: true
             runAsNonRoot: false
@@ -95,7 +58,7 @@ spec:
                   fieldPath: metadata.namespace
           ports:
             - name: "metrics"
-              containerPort: 32021
+              containerPort: {{ .Values.service.port }}
           volumeMounts:
             - name: pod-resources
               readOnly: true
@@ -123,21 +86,3 @@ spec:
         - name: tmp-dir
           hostPath:
             path: "/tmp/iluvatar"
-
----
-kind: Service
-apiVersion: v1
-metadata:
-  name: "ix-exporter"
-  namespace: "kube-system"
-  labels:
-    app.kubernetes.io/name: "ix-exporter"
-spec:
-  selector:
-    app.kubernetes.io/name: "ix-exporter"
-  type: NodePort
-  ports:
-    - name: "metrics"
-      port: 32021
-      targetPort: 32021
-      nodePort: 32021

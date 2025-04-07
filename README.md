@@ -58,7 +58,7 @@ Before running the **ix-exporter**, there are following preperations,
 
 ## Simple test of binary
 ```shell
-$ ./build/ix-exporter -c ./etc/metrics.yaml -r localhost:5777 -p 32021
+$ ./build/ix-exporter -c ./etc/metrics.yaml -p 32021
 ```
 
 Default listening in `http://localhost:32021`.  
@@ -67,35 +67,7 @@ $ curl http://localhost:32021/metrics
 ```
 
 # Quickstart on Kubernetes
-## Deploy IX Exporter in Kubernetes Cluster
-The next step is to run ix-expoter on each node as a Daemonset.
-
-```bash
-$ sudo kubectl apply -f deployment/static/ix-exporter.yaml
-```
-
-Check if the ```ix-exporter``` daemonset is deployed successfully in kubernetes cluster:
-```bash
-$ sudo kubectl -n kube-system get ds ix-exporter
-NAME          DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE
-ix-exporter   1         1         1       1            1            
-```
-
-## Config Prometheus
-If the Prometheus is deployed in kubernetes cluster, the next step is to create the ```ix-expoter``` ServiceMonitor object to integrate with Prometheus:  
-```bash
-$ sudo kubectl -n monitoring apply -f deployment/static/service-monitor.yaml
-```
-**Note**: make sure your prometheus is deployed in ```monitoring``` namespace.
-
-Check if the ```ix-expoter``` ServiceMonitor object is created successfully in kubernetes cluster:
-```bash
-$ sudo kubectl -n monitoring get servicemonitor ix-exporter
-NAME          AGE
-ix-exporter   8s
-```
-
-It may take a few minutes for ix-exporter to start publishing the metrics to Prometheus. The metrics availability can be verified by typing ix metric key (e.g. **ix_gpu_utilization**) in the event bar to determine if the GPU metrics are visible.
+See [Deploy IX Exporter in Kubernetes Cluster](deployment/README.md)
 
 # Example of gathering metrics on a GPU node
 ```shell
