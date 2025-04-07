@@ -19,7 +19,6 @@ package config
 
 import (
 	"fmt"
-	"io"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -42,24 +41,20 @@ type Sharing struct {
 
 // Config is a versioned struct used to hold configuration information.
 type ClusterConfig struct {
-	Version string  `json:"version"             yaml:"version"`
-	Flags   Flags   `json:"flags,omitempty"     yaml:"flags,omitempty"`
-	Sharing Sharing `json:"sharing,omitempty"   yaml:"sharing,omitempty"`
+	Version      string  `json:"version"             yaml:"version"`
+	ResourceName string  `json:"resourceName"        yaml:"resourceName"`
+	Flags        Flags   `json:"flags,omitempty"     yaml:"flags,omitempty"`
+	Sharing      Sharing `json:"sharing,omitempty"   yaml:"sharing,omitempty"`
 }
 
-func ParseClusterConfig(reader io.Reader) (*ClusterConfig, error) {
+func ParseClusterConfig(config string) (*ClusterConfig, error) {
 	var err error
-	var configYaml []byte
-
-	configYaml, err = io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("read error: %v", err)
-	}
+	configYaml := []byte(config)
 
 	var ccfg ClusterConfig
 	err = yaml.Unmarshal(configYaml, &ccfg)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal error: %v", err)
+		return nil, fmt.Errorf("error to unmarshal yaml config: %v", err)
 	}
 
 	return &ccfg, nil

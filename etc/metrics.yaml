@@ -1,7 +1,7 @@
 iluvatar:
   metrics:
     - name: ix_temperature
-      help: The temperature of the iluvatar GPU(C).
+      help: The temperature of the iluvatar GPU (C).
     - name: ix_fan_speed
       help: Fan speed of iluvatar GPU.
     - name: ix_sm_clock

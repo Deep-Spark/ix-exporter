@@ -1,0 +1,7 @@
+apiVersion: v2
+name: ix-exporter
+description: A Helm chart for ix-exporter
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.16.0-0"

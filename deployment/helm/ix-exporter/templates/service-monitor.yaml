@@ -13,14 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+{{- if .Values.serviceMonitor.enabled -}}
+---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app.kubernetes.io/name: ix-exporter
+    app.kubernetes.io/name: {{ .Release.Name }}
     app.kubernetes.io/part-of: kube-prometheus
-  name: ix-exporter
-  namespace: monitoring
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.serviceMonitor.namespace }}
 spec:
   endpoints:
     - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -34,7 +36,8 @@ spec:
   jobLabel: app.kubernetes.io/name
   namespaceSelector:
     matchNames:
-      - kube-system
+      - {{ .Release.Namespace }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: ix-exporter
+      app.kubernetes.io/name: {{ .Release.Name }}
+{{- end }}

@@ -239,17 +239,19 @@ func configToOpts(c *cli.Context) *collector.Options {
 
 func initIxDCGM(ops *collector.Options) (func(), error) {
 	if ops.UseRemoteHE {
-		logger.IXLog.Info("IxDCGM attemp to connect to remote hostengine at ", ops.RemoteHEInfo)
+		logger.IXLog.Info("Attempting to connect to remote ix-hostengine at ", ops.RemoteHEInfo)
 		cleanup, err := ixdcgm.Init(ixdcgm.Standalone, ops.RemoteHEInfo, "0")
 		if err != nil {
+			logger.IXLog.Errorf("Failed to connect to remote ix-hostengine: %v", err)
 			cleanup()
 			return nil, err
 		}
 		return cleanup, nil
 	} else {
-		logger.IXLog.Info("IxDCGM attemp to init ixdcgm with embedded mode")
+		logger.IXLog.Info("Initializing ixdcgm in embedded mode")
 		cleanup, err := ixdcgm.Init(ixdcgm.Embedded)
 		if err != nil {
+			logger.IXLog.Errorf("Failed to initialize ixdcgm in embedded mode: %v", err)
 			cleanup()
 			return nil, err
 		}

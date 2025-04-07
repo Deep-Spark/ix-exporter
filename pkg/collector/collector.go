@@ -179,13 +179,13 @@ func processDeviceAtIndex(info *SysInfo, index uint, boardChips *[]chip) error {
 	pos, ret := device.GetBoardPosition()
 	if ret != ixml.SUCCESS {
 		if ret == ixml.ERROR_NOT_SUPPORTED {
-			logger.IXLog.Infof("GPU %s not support splitboard.", gpu.name)
+			logger.IXLog.Infof("GPU %s not support splitboard.", gpu.uuid)
 			info.pairChips[uuid] = uuid
 		} else {
-			logger.IXLog.Warningf("Unable to get BoardPosition %v", ret)
+			return fmt.Errorf("Failed to get board position of %s, ret: %v", gpu.uuid, ret)
 		}
 	} else {
-		logger.IXLog.Infof("GPU %s on board %d.", gpu.name, pos)
+		logger.IXLog.Infof("The board position of %s is: %d", gpu.uuid, pos)
 		key := chip{
 			uuid:      uuid,
 			operation: device,
@@ -203,7 +203,8 @@ func collectChipData(info *SysInfo) []chip {
 
 	for index := uint(0); index < info.GPUCount; index++ {
 		if err := processDeviceAtIndex(info, index, &boardChips); err != nil {
-			break
+			logger.IXLog.Errorf("error to process device at index %d: %v", index, err)
+			continue
 		}
 	}
 
@@ -245,11 +246,12 @@ func getDeviceInfo() SysInfo {
 				}
 				continue
 			}
-			if onSameBoard == 1 {
+			if onSameBoard == 1 { // 1 means on same board
 				chipmap[first.uuid] = true
 				chipmap[second.uuid] = true
 				info.pairChips[first.uuid] = second.uuid
 				info.pairChips[second.uuid] = first.uuid
+				logger.IXLog.Infof("%s and %s on same board", first.uuid, second.uuid)
 				break
 			}
 		}
