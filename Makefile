@@ -14,15 +14,15 @@
 # limitations under the License.
 
 TARGET := ix-exporter
-VERSION ?= 4.2.0
+VERSION ?= 4.3.0
 
 MODULE := gitee.com/deep-spark/ixexporter
 DOCKER ?= docker
 
 ifeq ($(REGISTRY),)
-IMAGE_NAME = ix-exporter:$(VERSION)-x86_64
+IMAGE_NAME = ix-exporter:$(VERSION)
 else 
-IMAGE_NAME = $(REGISTRY)/ix-exporter:$(VERSION)-x86_64
+IMAGE_NAME = $(REGISTRY)/ix-exporter:$(VERSION)
 endif
 
 GOOS := linux

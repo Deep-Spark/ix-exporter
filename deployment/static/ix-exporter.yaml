@@ -74,7 +74,7 @@ spec:
       priorityClassName: system-node-critical
       serviceAccountName: ix-exporter
       containers:
-        - image: "ix-exporter:4.2.0-x86_64"
+        - image: "registry.iluvatar.com.cn:10443/k8s/ix-exporter:4.3.0"
           name: "ix-exporter"
           args:
             - --log-level=4
