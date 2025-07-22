@@ -35,6 +35,18 @@ spec:
           operator: Exists
       priorityClassName: system-node-critical
       serviceAccountName: service-account-{{ .Release.Name }}
+      {{- if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
       containers:
         - image: {{ .Values.image }}
           name: {{ .Release.Name }}
@@ -70,9 +82,20 @@ spec:
             - name: host-time
               mountPath: /etc/localtime
               readOnly: true
-            - name: tmp-dir
-              mountPath: "/tmp"
+            - name: log-dir
+              mountPath: "/var/log/iluvatarcorex"
               readOnly: false
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 45
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 45
       volumes:
         - name: host-proc
           hostPath:
@@ -83,6 +106,6 @@ spec:
         - name: host-time
           hostPath:
             path: /etc/localtime
-        - name: tmp-dir
+        - name: log-dir
           hostPath:
-            path: "/tmp/iluvatar"
+            path: "/var/log/iluvatarcorex"

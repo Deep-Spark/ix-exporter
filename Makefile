@@ -32,9 +32,6 @@ COREX_PATH := /usr/local/corex
 COREX_LIBS := libixml.so \
         	  libcuda.so \
         	  libcuda.so.1 \
-        	  libcudart.so \
-        	  libcudart.so.10.2 \
-        	  libcudart.so.10.2.89 \
         	  libixthunk.so
 
 IXDCGM_PATH := /usr/local/ixdcgm
@@ -46,7 +43,7 @@ all: build image
 .PHONY: build
 build:
 	CGO_CFLAGS=-I${COREX_PATH}/include GOOS=$(GOOS) CGO_ENABLED=1 \
-	go build -ldflags "-s -w" \
+	go build -mod=mod -ldflags "-s -w" \
 	    -o $(BUILD_DIR)/$(TARGET) $(MODULE)/cmd/$(TARGET)
 
 .PHONY: image

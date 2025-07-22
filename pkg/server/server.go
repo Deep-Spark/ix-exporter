@@ -37,41 +37,40 @@ type MetricsServer struct {
 }
 
 func NewMetricsServer(opts *collector.Options, reg *prometheus.Registry) *MetricsServer {
-
 	mServer := &MetricsServer{
 		server: &http.Server{
 			Addr:           opts.IP + ":" + opts.Port,
-			Handler:        http.DefaultServeMux,
 			ReadTimeout:    10 * time.Second,
 			WriteTimeout:   10 * time.Second,
 			MaxHeaderBytes: http.DefaultMaxHeaderBytes,
 		},
 	}
 
-	http.Handle("/", http.HandlerFunc(
-		func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, err := w.Write([]byte(`<html>
-				<head><title>Iluvatar-Exporter</title></head>
-				<body>
-				<h1>Iluvatar-Exporter</h1>
-				<p><a href="./metrics">Metrics</a></p>
-				</body>
-				</html>
-			`))
-			if err != nil {
-				logger.IXLog.Errorf("Write response error: %v", err)
-			}
-		},
-	))
-
-	http.Handle("/metrics", promhttp.HandlerFor(reg,
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(`<html>
+<head><title>Iluvatar-Exporter</title></head>
+<body>
+<h1>Iluvatar-Exporter</h1>
+<p><a href="./metrics">Metrics</a></p>
+<p><a href="./health">Health</a></p>
+</body>
+</html>`))
+		if err != nil {
+			logger.IXLog.Errorf("Write response error: %v", err)
+		}
+	})
+	mux.HandleFunc("/health", mServer.Health)
+	mux.Handle("/metrics", promhttp.HandlerFor(reg,
 		promhttp.HandlerOpts{
 			ErrorHandling: promhttp.ContinueOnError,
-		}),
-	)
+		}))
 
+	mServer.server.Handler = mux
 	return mServer
+
 }
 
 func (ms *MetricsServer) Run(ctx context.Context, cancel context.CancelFunc) {
@@ -86,16 +85,25 @@ func (ms *MetricsServer) Run(ctx context.Context, cancel context.CancelFunc) {
 	<-ctx.Done()
 	// Disable keep-alives to ensure all connections are closed promptly
 	ms.server.SetKeepAlivesEnabled(false)
-	ms.serverShutdown()
+	ms.Shutdown(ctx)
 }
 
-func (ms *MetricsServer) serverShutdown() {
+func (ms *MetricsServer) Health(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+	_, err := w.Write([]byte("OK"))
+	if err != nil {
+		logger.IXLog.Errorf("Failed to write health response, err: %v", err)
+		http.Error(w, "failed to write health response", http.StatusInternalServerError)
+	}
+}
+
+func (ms *MetricsServer) Shutdown(ctx context.Context) {
 	logger.IXLog.Infof("Metrics server is shutting down")
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
 	if err := ms.server.Shutdown(ctx); err != nil {
-		logger.IXLog.Errorf("Metrics server shutdown error: %v", err)
+		logger.IXLog.Fatalf("Metrics server shutdown error: %v", err)
 	} else {
 		logger.IXLog.Infof("Metrics server stopped")
+		ms.server.Close()
 	}
 }

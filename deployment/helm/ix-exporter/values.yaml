@@ -15,3 +15,20 @@ service:
 serviceMonitor: 
   enabled: false # Set to true to enable the creation of a ServiceMonitor
   namespace: "monitoring" # The namespace where the ServiceMonitor will be created
+  interval: 30s
+  honorLabels: false # Controls whether Prometheus preserves the metric's labels when they collide with the target's labels.
+  honorTimestamps: false # Controls whether Prometheus preserves the timestamps when exposed by the target.
+
+nodeSelector: {}
+  #node: gpu
+
+tolerations: []
+#- operator: Exists
+
+affinity: {}
+  #nodeAffinity:
+  #  requiredDuringSchedulingIgnoredDuringExecution:
+  #    nodeSelectorTerms:
+  #    - matchExpressions:
+  #      - key: iluvatar-gpu
+  #        operator: Exists
