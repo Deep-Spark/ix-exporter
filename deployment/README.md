@@ -23,8 +23,7 @@ $ sudo helm install ix-exporter deployment/helm/ix-exporter \
     --set daemonset.logFile=<your_log_file> \ # Set the log file, default is /var/log/ix-exporter.log
     --set service.ip=<your_service_ip> \ # Set the service ip of metrics, default is 0.0.0.0
     --set service.port=<your_service_port> \ # Set the service port of metrics, default is 32021
-    --set serviceMonitor.enabled=true \ # Enable ServiceMonitor object if you want to integrate ix-exporter with Prometheus, default is false
-    --set serviceMonitor.namespace=monitoring \ # Set the namespace for the ServiceMonitor object, default is monitoring
+    --set serviceMonitor.enabled=true # Enable ServiceMonitor object if you want to integrate ix-exporter with Prometheus, default is false
 ```
 **Note**: typically, you only need to set the image.
 

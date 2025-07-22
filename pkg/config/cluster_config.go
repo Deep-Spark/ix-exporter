@@ -23,6 +23,14 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
+const (
+	IXResourceName  = "iluvatar.com/gpu"
+	IXConfigMap     = "ix-config"
+	IXConfigDataKey = "ix-config"
+)
+
+var SplitBoard bool = false // default is false, set to true if splitboard is enabled
+
 type Flags struct {
 	SplitBoard bool `json:"splitboard"                yaml:"splitboard"`
 }
@@ -41,20 +49,20 @@ type Sharing struct {
 
 // Config is a versioned struct used to hold configuration information.
 type ClusterConfig struct {
-	Version      string  `json:"version"             yaml:"version"`
+	Version      string  `json:"version,omitempty"   yaml:"version,omitempty"`
 	ResourceName string  `json:"resourceName"        yaml:"resourceName"`
 	Flags        Flags   `json:"flags,omitempty"     yaml:"flags,omitempty"`
 	Sharing      Sharing `json:"sharing,omitempty"   yaml:"sharing,omitempty"`
 }
 
-func ParseClusterConfig(config string) (*ClusterConfig, error) {
+func ParseClusterConfig(yamlStr string) (*ClusterConfig, error) {
 	var err error
-	configYaml := []byte(config)
+	yamlBytes := []byte(yamlStr)
 
 	var ccfg ClusterConfig
-	err = yaml.Unmarshal(configYaml, &ccfg)
+	err = yaml.Unmarshal(yamlBytes, &ccfg)
 	if err != nil {
-		return nil, fmt.Errorf("error to unmarshal yaml config: %v", err)
+		return nil, fmt.Errorf("error to unmarshal ix config: %v", err)
 	}
 
 	return &ccfg, nil

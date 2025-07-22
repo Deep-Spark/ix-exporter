@@ -123,17 +123,17 @@ func (ctx *ixContext) getCachedMetrics() bool {
 	if ctx.procEndFlag {
 		now := time.Now()
 		if now.Before(ctx.procEndTime.Add(CacheExpiryTime)) {
-			logger.IXLog.Infoln("last collect process is finished and cached is fresh, return the cached metrics.")
+			logger.IXLog.Infoln("Last collect process is finished and cached is fresh, return the cached metrics.")
 			return true
 		} else {
-			logger.IXLog.Infoln("last collect process is finished but cached is stale, start to collect new metrics.")
+			logger.IXLog.Infoln("Last collect process is finished but cached is stale, start to collect new metrics.")
 			return false
 		}
 	} else if ctx.procStartFlag {
-		logger.IXLog.Infoln("collect process is running, wait and return the collected metrics.")
+		logger.IXLog.Infoln("Collect process is running, wait and return the collected metrics.")
 		select {
 		case <-time.After(CollectWaitTime):
-			logger.IXLog.Errorln("collect process is timeout, start to collect new metrics.")
+			logger.IXLog.Errorln("Collect process is timeout, start to collect new metrics.")
 			return false
 		case <-ctx.metricUptCh: // Wait until metrics updated.
 			return true
@@ -154,7 +154,7 @@ func (ctx *ixContext) getMetrics() MetricsMap {
 
 	select {
 	case <-time.After(CollectWaitTime):
-		logger.IXLog.Errorln("not all of metrics are updated within timeout peroid.")
+		logger.IXLog.Errorln("Not all of metrics are updated within timeout peroid.")
 	case <-ctx.metricColCh: // Wait all metrics are updated.
 		for uuid, ms := range ctx.metricss {
 			updateMetrics := []*Metric{}

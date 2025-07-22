@@ -75,10 +75,10 @@ func (gc *gpuCollector) collect(ctx *ixContext) {
 			gc.statusGather.DcgmGroupDestroy()
 			return
 		case <-ctx.signalCh:
-			logger.IXLog.Infoln("start to collect gpu metrics")
+			logger.IXLog.Infoln("Start to collect gpu metrics")
 			gc.collectMetrics(ctx)
 			ctx.updateStat()
-			logger.IXLog.Infoln("gpu collector has updated all metrics.")
+			logger.IXLog.Infoln("Gpu collector has updated all metrics.")
 		}
 	}
 }
@@ -96,7 +96,7 @@ func (gc *gpuCollector) collectMetrics(ctx *ixContext) {
 		metrics[uuid] = gc.collectGpuMetrics(ctx, &gpu)
 	}
 
-	logger.IXLog.Infof("store gpu device metrics.")
+	logger.IXLog.Infof("Store gpu device metrics.")
 	ctx.storeMetrics(metrics)
 }
 

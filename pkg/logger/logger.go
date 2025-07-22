@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -38,6 +39,11 @@ func init() {
 }
 
 func InitIXLog(fileName string, logLevel int) error {
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
+		if err := os.MkdirAll(filepath.Dir(fileName), 0755); err != nil {
+			return err
+		}
+	}
 	err := IXLog.UpdateConfig(fileName, logLevel)
 	if err != nil {
 		return err

@@ -26,6 +26,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli/v2"
@@ -33,6 +34,7 @@ import (
 	"gitee.com/deep-spark/go-ixdcgm/pkg/ixdcgm"
 	"gitee.com/deep-spark/go-ixml/pkg/ixml"
 	"gitee.com/deep-spark/ixexporter/pkg/collector"
+	"gitee.com/deep-spark/ixexporter/pkg/informer"
 	"gitee.com/deep-spark/ixexporter/pkg/logger"
 	"gitee.com/deep-spark/ixexporter/pkg/server"
 )
@@ -61,7 +63,7 @@ const (
 	portRight      = 65535
 	minLogLevel    = -1
 	maxLogLevel    = 7
-	defaultLogFile = "/tmp/log/ix-exporter.log"
+	defaultLogFile = "/var/log/iluvatarcorex/ix-exporter/ix-exporter.log"
 )
 
 func NewApp(buildVersion ...string) *cli.App {
@@ -170,58 +172,78 @@ func verifyFlags(c *cli.Context) error {
 
 func start(c *cli.Context) error {
 	opts := configToOpts(c)
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	defer close(sig)
+
+	if opts.EnableKube {
+		if err := informer.StartIxInformer(opts, sig); err != nil {
+			return fmt.Errorf("failed to start ix informer: %v", err)
+		}
+		logger.IXLog.Info("ix informer started successfully!")
+	}
+
+	for {
+		loop, err := startMetricsServer(opts, sig)
+		if err != nil {
+			return fmt.Errorf("failed to start metrics server: %v", err)
+		}
+		if loop {
+			logger.IXLog.Info("Restarting ix-exporter due to SIGHUP signal.")
+			time.Sleep(1 * time.Second) // Sleep before restarting
+		} else {
+			logger.IXLog.Info("Exiting ix-exporter gracefully.")
+			break
+		}
+	}
+
+	return nil
+}
+
+func startMetricsServer(opts *collector.Options, sig chan os.Signal) (loop bool, err error) {
 	ret := ixml.Init()
 	if ret != ixml.SUCCESS {
-		return fmt.Errorf("failed to init IXML: %v", ret)
+		return false, fmt.Errorf("failed to init IXML: %v", ret)
 	}
 	logger.IXLog.Info("IXML successfully initialized!")
 
 	cleanupIxDCGM, err := initIxDCGM(opts)
 	if err != nil {
-		return fmt.Errorf("failed to init IxDCGM: %v", err)
+		return false, fmt.Errorf("failed to init IxDCGM: %v", err)
 	}
 	logger.IXLog.Info("IxDCGM successfully initialized!")
-	defer cleanupIxDCGM()
+
+	// Create a new context for this run of the exporter
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	reg := prometheus.NewRegistry()
 	ixCollector, err := collector.NewIXCollector(opts)
 	if err != nil {
 		logger.IXLog.Errorf("Failed to create iluvatar collector: %v", err)
-		return err
+		return false, err
 	}
 	reg.MustRegister(ixCollector)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	mServer := server.NewMetricsServer(opts, reg)
 	go func() {
 		mServer.Run(ctx, cancel)
 	}()
 
-	sigChn := make(chan os.Signal, 1)
-	defer close(sigChn)
-	signal.Notify(sigChn, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	select {
-	case s := <-sigChn:
-		logger.IXLog.Infof("Received signal %v, shutting down.", s)
-		ret := ixml.Shutdown()
-		if ret != ixml.SUCCESS {
-			logger.IXLog.Errorf("Unable to shutdown IXML: %v", ret)
-		}
-		cleanupIxDCGM()
-		reg.Unregister(ixCollector)
+	s := <-sig
+	logger.IXLog.Infof("Received signal: %s", s.String())
+	cancel()
 
-	case <-ctx.Done():
-		ret := ixml.Shutdown()
-		if ret != ixml.SUCCESS {
-			logger.IXLog.Errorf("Unable to shutdown IXML: %v", ret)
-		}
-		cleanupIxDCGM()
-		reg.Unregister(ixCollector)
+	logger.IXLog.Infof("Shutting down ix-exporter gracefully...")
+	reg.Unregister(ixCollector)
+	ixml.Shutdown()
+	cleanupIxDCGM()
+
+	if s != syscall.SIGHUP {
+		return false, nil
 	}
 
-	return nil
+	return true, nil
 }
 
 func configToOpts(c *cli.Context) *collector.Options {

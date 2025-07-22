@@ -19,9 +19,7 @@ package collector
 
 import (
 	"context"
-	"fmt"
 	"net"
-	"os"
 	"time"
 
 	"gitee.com/deep-spark/ixexporter/pkg/config"
@@ -31,7 +29,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
@@ -39,10 +36,7 @@ import (
 
 const (
 	socketFile           = "/var/lib/kubelet/pod-resources/kubelet.sock"
-	IXResourceName       = "iluvatar.com/gpu"
 	DefaultPodResMaxSize = 1024 * 1024 * 16 // 16 Mb
-	IXConfigMap          = "ix-config"
-	IXConfigDataKey      = "ix-config"
 )
 
 type gpuPod struct {
@@ -52,10 +46,9 @@ type gpuPod struct {
 }
 
 type kubeCollector struct {
-	clientset  kubernetes.Interface
-	sysinfo    SysInfo
-	timeout    time.Duration
-	SplitBoard bool
+	clientset kubernetes.Interface
+	sysinfo   SysInfo
+	timeout   time.Duration
 }
 
 func initClientSet() kubernetes.Interface {
@@ -87,12 +80,6 @@ func InitKubeCollector(ic *IXCollector) {
 		return
 	}
 	kc.clientset = initClientSet()
-	if err := kc.confirmSplitBoard(); err != nil {
-		logger.IXLog.Errorf("Failed to confirm splitboard config: %v", err)
-		return
-	}
-	logger.IXLog.Infof("Splitboard config: %v", kc.SplitBoard)
-
 	ic.ctx.registerCollector(kc)
 	go kc.collect(ic.ctx)
 }
@@ -135,43 +122,16 @@ func (kc *kubeCollector) collectMetrics(ctx *ixContext) {
 	ctx.labelValues = labels
 }
 
-func (kc *kubeCollector) confirmSplitBoard() error {
-	logger.IXLog.Infoln("Start to confirm splitboard config")
-	kc.SplitBoard = false
-	if os.Getenv("POD_NAMESPACE") == "" {
-		logger.IXLog.Warningf("Haven't set POD_NAMESPACE environment variable")
-		return nil
-	}
-
-	ns := os.Getenv("POD_NAMESPACE")
-	cm, err := kc.clientset.CoreV1().ConfigMaps(ns).Get(context.TODO(), IXConfigMap, metav1.GetOptions{})
-	if err != nil {
-		logger.IXLog.Warningf("Can't get %s configmap from %s namespace: %v", IXConfigMap, ns, err)
-		return nil
-	}
-
-	ixConfig, ok := cm.Data[IXConfigDataKey]
-	if !ok {
-		return fmt.Errorf("can't find %s data in %s configmap", IXConfigDataKey, IXConfigMap)
-	}
-
-	clusterConfig, err := config.ParseClusterConfig(ixConfig)
-	if err != nil {
-		return fmt.Errorf("error to parse cluster config: %v", err)
-	}
-
-	kc.SplitBoard = clusterConfig.Flags.SplitBoard
-	return nil
-}
-
 func (kc *kubeCollector) filterGpuPods(pods *podresourcesapi.ListPodResourcesResponse) map[string]gpuPod {
 	gpuPods := make(map[string]gpuPod)
+	splitboard := config.SplitBoard
+	logger.IXLog.Infof("SplitBoard config is %v for this collection cycle", splitboard)
 
 	for _, pod := range pods.GetPodResources() {
 		for _, container := range pod.GetContainers() {
 			for _, containerDevices := range container.GetDevices() {
 				resourceName := containerDevices.GetResourceName()
-				if resourceName != IXResourceName {
+				if resourceName != config.IXResourceName {
 					continue
 				}
 				var gpuUuids []string
@@ -179,7 +139,7 @@ func (kc *kubeCollector) filterGpuPods(pods *podresourcesapi.ListPodResourcesRes
 				for _, uuid := range containerDevices.GetDeviceIds() {
 					// gpuUuids = append(gpuUuids, utils.RemoveDeviceIduffix(uuid))
 					uuidTmp := utils.RemoveDeviceIduffix(uuid)
-					if !kc.SplitBoard {
+					if !splitboard {
 						if uuid_slary, ok := kc.sysinfo.pairChips[uuidTmp]; ok {
 							if uuid_slary != uuidTmp {
 								gpuUuids = append(gpuUuids, uuidTmp)
