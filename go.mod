@@ -2,11 +2,11 @@ module gitee.com/deep-spark/ixexporter
 
 go 1.23.0
 
-toolchain go1.23.2
+toolchain go1.24.6
 
 require (
-	gitee.com/deep-spark/go-ixdcgm v0.0.0-20250402060448-47ce1e307b56
-	gitee.com/deep-spark/go-ixml v0.0.0-20250402060659-7a8e7dc6e049
+	gitee.com/deep-spark/go-ixdcgm v0.0.0-20250528014305-d6758dddbdab
+	gitee.com/deep-spark/go-ixml v0.0.0-20250616014525-a1a4e063554a
 )
 
 require (
@@ -56,7 +56,7 @@ require (
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	golang.org/x/net v0.30.0 // indirect
-	golang.org/x/oauth2 v0.21.0 // indirect
+	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/term v0.25.0 // indirect
 	golang.org/x/text v0.19.0 // indirect
