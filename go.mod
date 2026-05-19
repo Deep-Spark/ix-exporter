@@ -10,6 +10,7 @@ require (
 )
 
 require (
+	github.com/jochenvg/go-udev v0.0.0-20240801134859-b65ed646224b
 	github.com/prometheus/client_golang v1.19.1
 	github.com/sirupsen/logrus v1.6.0
 	github.com/urfave/cli/v2 v2.27.4
@@ -20,6 +21,7 @@ require (
 	k8s.io/apimachinery v0.28.1
 	k8s.io/client-go v0.28.1
 	k8s.io/kubelet v0.28.1
+	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
@@ -46,6 +48,8 @@ require (
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+
+	github.com/jkeiser/iter v0.0.0-20200628201005-c8aa0ae784d1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
@@ -70,5 +74,4 @@ require (
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
-	sigs.k8s.io/yaml v1.4.0 // indirect
 )

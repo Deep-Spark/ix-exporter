@@ -22,7 +22,9 @@ import "time"
 const (
 	Iluvatar = "iluvatar"
 
-	IxTemperature       = "ix_temperature"
+	IxTemperature       = "ix_temperature" // Deprecated
+	IxGpuTemperature    = "ix_gpu_temperature"
+	IxMemTemperature    = "ix_mem_temperature"
 	IxFanSpeed          = "ix_fan_speed"
 	IxSmClock           = "ix_sm_clock"
 	IxMemClock          = "ix_mem_clock"
@@ -51,29 +53,6 @@ const (
 )
 
 const (
-	LabelGPU         = "gpu"
-	LabelName        = "name"
-	LabelUuid        = "uuid"
-	LabelNamespace   = "namespace"
-	LabelPod         = "pod"
-	LabelContainer   = "container"
-	LabelNodeName    = "node_name"
 	LabelProcessPid  = "process_pid"
 	LabelProcessName = "process_name"
 )
-
-var LabelList = []string{
-	LabelGPU,
-	LabelName,
-	LabelUuid,
-}
-
-var LabelAllList = []string{
-	LabelGPU,
-	LabelName,
-	LabelUuid,
-	LabelNamespace,
-	LabelPod,
-	LabelContainer,
-	LabelNodeName,
-}

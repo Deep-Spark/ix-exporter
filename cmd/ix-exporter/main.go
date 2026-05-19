@@ -18,7 +18,6 @@ limitations under the License.
 package main
 
 import (
-	"log"
 	"os"
 
 	"gitee.com/deep-spark/ixexporter/pkg/cmd"
@@ -28,8 +27,6 @@ func main() {
 	app := cmd.NewApp()
 	err := app.Run(os.Args)
 	if err != nil {
-		log.SetOutput(os.Stderr)
-		log.Printf("Error: %v", err)
 		os.Exit(1)
 	}
 }

@@ -28,18 +28,45 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
+var (
+	LabelDriver    string = "driver"
+	LabelIxml             = "ixml"
+	LabelGpuIdx           = "gpu"
+	LabelGpuName          = "name"
+	LabelGpuUuid          = "uuid"
+	LabelGpuSerial        = "serial"
+	LabelNamespace        = "namespace"
+	LabelPod              = "pod"
+	LabelContainer        = "container"
+	LabelNodeName         = "node_name"
+)
+
+type LabelMap struct {
+	Name          string `yaml:"name,omitempty"`
+	GpuIndex      string `yaml:"gpu,omitempty"`
+	Uuid          string `yaml:"uuid,omitempty"`
+	Serial        string `yaml:"serial,omitempty"`
+	DriverVersion string `yaml:"driver,omitempty"`
+	IxmlVersion   string `yaml:"ixml,omitempty"`
+	NodeName      string `yaml:"node_name,omitempty"`
+	Namespace     string `yaml:"namespace,omitempty"`
+	Pod           string `yaml:"pod,omitempty"`
+	Container     string `yaml:"container,omitempty"`
+}
+
 type MetricItem struct {
 	Name string `yaml:"name"`
 	Help string `yaml:"help"`
 }
 
-type MetricItemList struct {
-	Metrics []MetricItem `yaml:"metrics"`
+type MetricsLabels struct {
+	Metrics  []MetricItem `yaml:"metrics"`
+	LabelMap *LabelMap    `yaml:"labels"`
 }
 
 type MetricConfig struct {
-	ConfigFile string
-	MetricsMap map[string]MetricItemList
+	ConfigFile    string
+	MetricsLabels *MetricsLabels
 }
 
 func (c *MetricConfig) ParseMetricConfig() error {
@@ -58,7 +85,7 @@ func (c *MetricConfig) ParseMetricConfig() error {
 		return err
 	}
 
-	if err = yaml.Unmarshal(data, c.MetricsMap); err != nil {
+	if err = yaml.Unmarshal(data, c.MetricsLabels); err != nil {
 		logger.IXLog.Errorln("fail to parse config data.")
 		return err
 	}
@@ -72,19 +99,64 @@ func (c *MetricConfig) ParseMetricConfig() error {
 }
 
 func (c *MetricConfig) verifyConfig() error {
-	for k, v := range c.MetricsMap {
-		if k == "" || len(v.Metrics) == 0 {
-			return errors.New("miss field 'name' or 'metrics' in config file")
+	if len(c.MetricsLabels.Metrics) == 0 {
+		return errors.New("no metrics configured in config file")
+	}
+
+	for i, metric := range c.MetricsLabels.Metrics {
+		if metric.Name == "" {
+			return errors.New("miss field 'name' in 'metrics' configuration of metrics " + strconv.Itoa(i))
 		}
-		for i, metric := range v.Metrics {
-			if metric.Name == "" {
-				return errors.New("miss field 'name' in 'metrics' configuration of metrics" + strconv.Itoa(i))
-			}
-			if metric.Help == "" {
-				return errors.New("miss field 'help' in 'metrics' configuration of metrics" + strconv.Itoa(i))
-			}
+		if metric.Help == "" {
+			return errors.New("miss field 'help' in 'metrics' configuration of metrics " + strconv.Itoa(i))
 		}
 	}
 
 	return nil
+}
+
+func (c *MetricConfig) ParseLabelConfig(k8s bool) ([]string, error) {
+	labels := make([]string, 0)
+	l := c.MetricsLabels.LabelMap
+	if l.Name != "" {
+		LabelGpuName = l.Name
+		labels = append(labels, LabelGpuName)
+	}
+	if l.GpuIndex != "" {
+		LabelGpuIdx = l.GpuIndex
+		labels = append(labels, LabelGpuIdx)
+	}
+	if l.Uuid != "" {
+		LabelGpuUuid = l.Uuid
+		labels = append(labels, LabelGpuUuid)
+	}
+	if l.Serial != "" {
+		LabelGpuSerial = l.Serial
+		labels = append(labels, LabelGpuSerial)
+	}
+	if l.DriverVersion != "" {
+		LabelDriver = l.DriverVersion
+		labels = append(labels, LabelDriver)
+	}
+	if l.IxmlVersion != "" {
+		LabelIxml = l.IxmlVersion
+		labels = append(labels, LabelIxml)
+	}
+	if l.NodeName != "" {
+		LabelNodeName = l.NodeName
+		labels = append(labels, LabelNodeName)
+	}
+	if l.Namespace != "" && k8s {
+		LabelNamespace = l.Namespace
+		labels = append(labels, LabelNamespace)
+	}
+	if l.Pod != "" && k8s {
+		LabelPod = l.Pod
+		labels = append(labels, LabelPod)
+	}
+	if l.Container != "" && k8s {
+		LabelContainer = l.Container
+		labels = append(labels, LabelContainer)
+	}
+	return labels, nil
 }

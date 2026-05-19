@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
 	"gitee.com/deep-spark/ixexporter/pkg/collector"
@@ -56,30 +55,16 @@ type ixInformer struct {
 	informer  cache.SharedIndexInformer
 	factory   informers.SharedInformerFactory
 	opts      *collector.Options
-	ns        string // Namespace where the ConfigMap is located
 }
 
 var _ IxInformer = &ixInformer{}
 
 func StartIxInformer(opts *collector.Options, sig chan os.Signal) error {
-	kConfig, err := rest.InClusterConfig()
-	if err != nil {
-		return err
-	}
-	clientset, err := kubernetes.NewForConfig(kConfig)
-	if err != nil {
-		return err
-	}
-
-	ns := os.Getenv("POD_NAMESPACE")
-	if ns == "" {
-		return fmt.Errorf("failed to get POD_NAMESPACE environment variable")
-	}
 	fieldSelector := fields.SelectorFromSet(fields.Set{"metadata.name": config.IXConfigMap})
 	factory := informers.NewSharedInformerFactoryWithOptions(
-		clientset,
+		opts.ClientSet,
 		0,
-		informers.WithNamespace(ns),
+		informers.WithNamespace(opts.Namespace),
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.FieldSelector = fieldSelector.String()
 		}),
@@ -87,11 +72,10 @@ func StartIxInformer(opts *collector.Options, sig chan os.Signal) error {
 
 	cmInformer := factory.Core().V1().ConfigMaps().Informer()
 	resetInformer := &ixInformer{
-		clientset: clientset,
+		clientset: opts.ClientSet,
 		informer:  cmInformer,
 		factory:   factory,
 		opts:      opts,
-		ns:        ns,
 	}
 
 	if err := resetInformer.initSplitBoard(); err != nil {
@@ -100,15 +84,16 @@ func StartIxInformer(opts *collector.Options, sig chan os.Signal) error {
 
 	cmInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			logger.IXLog.Infof("ConfigMap Added: %s/%s", ns, config.IXConfigMap)
+			logger.IXLog.Infof("ConfigMap Added: %s/%s", opts.Namespace, config.IXConfigMap)
 			resetInformer.UpdateCm(obj, sig)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			logger.IXLog.Infof("ConfigMap Updated: %s/%s", ns, config.IXConfigMap)
+			logger.IXLog.Infof("ConfigMap Updated: %s/%s", opts.Namespace, config.IXConfigMap)
 			resetInformer.UpdateCm(newObj, sig)
 		},
 		DeleteFunc: func(obj interface{}) {
-			logger.IXLog.Infof("ConfigMap Deleted: %s/%s", ns, config.IXConfigMap)
+			logger.IXLog.Infof("ConfigMap Deleted: %s/%s", opts.Namespace, config.IXConfigMap)
+			logger.IXLog.Infof("SplitBoard config remains unchanged: %v", config.SplitBoard)
 		},
 	})
 
@@ -137,17 +122,17 @@ func (f *ixInformer) Start() {
 
 func (f *ixInformer) initSplitBoard() error {
 	logger.IXLog.Infoln("Start to init splitboard config")
-	cm, err := f.clientset.CoreV1().ConfigMaps(f.ns).Get(context.TODO(), config.IXConfigMap, metav1.GetOptions{})
+	cm, err := f.clientset.CoreV1().ConfigMaps(f.opts.Namespace).Get(context.TODO(), config.IXConfigMap, metav1.GetOptions{})
 	if err != nil {
-		logger.IXLog.Warningf("Failed to get %s configmap from %s namespace, err: %v", config.IXConfigMap, f.ns, err)
+		logger.IXLog.Warningf("Failed to get %s configmap from %s namespace, err: %v", config.IXConfigMap, f.opts.Namespace, err)
 		config.SplitBoard = false // Default to false if configmap is not found
 		logger.IXLog.Infof("SplitBoard config initialized to: %v", config.SplitBoard)
 		return nil
 	}
 
-	ixConfig, ok := cm.Data[config.IXConfigDataKey]
+	ixConfig, ok := cm.Data[config.IXConfigKey]
 	if !ok {
-		return fmt.Errorf("key %q not found in ConfigMap %q", config.IXConfigDataKey, config.IXConfigMap)
+		return fmt.Errorf("key %q not found in ConfigMap %q", config.IXConfigKey, config.IXConfigMap)
 	}
 
 	clusterConfig, err := config.ParseClusterConfig(ixConfig)
@@ -167,20 +152,28 @@ func (f *ixInformer) UpdateCm(obj interface{}, sig chan os.Signal) {
 		return
 	}
 
-	ixConfig, ok := cm.Data[config.IXConfigDataKey]
+	ixcfgStr, ok := cm.Data[config.IXConfigKey]
 	if !ok {
-		logger.IXLog.Errorf("can't find %s data in %s configmap", config.IXConfigDataKey, config.IXConfigMap)
+		logger.IXLog.Errorf("can't find %s data in %s configmap", config.IXConfigKey, config.IXConfigMap)
 		return
 	}
 
-	clusterConfig, err := config.ParseClusterConfig(ixConfig)
+	ixcfg, err := config.ParseClusterConfig(ixcfgStr)
 	if err != nil {
-		logger.IXLog.Errorf("failed to parse cluster config: %v", err)
+		logger.IXLog.Errorf("failed to parse %s data: %v", config.IXConfigKey, err)
 		return
 	}
 
-	if config.SplitBoard != clusterConfig.Flags.SplitBoard {
-		config.SplitBoard = clusterConfig.Flags.SplitBoard
+	if config.SplitBoard != ixcfg.Flags.SplitBoard {
+		config.SplitBoard = ixcfg.Flags.SplitBoard
 		logger.IXLog.Infof("SplitBoard config changed to: %v", config.SplitBoard)
+	}
+	if config.ResetGpu != ixcfg.Flags.ResetGpu {
+		config.ResetGpu = ixcfg.Flags.ResetGpu
+		logger.IXLog.Infof("ResetGpu config changed to: %v", config.ResetGpu)
+	}
+	if config.ResourceName != ixcfg.ResourceName {
+		config.ResourceName = ixcfg.ResourceName
+		logger.IXLog.Infof("ResourceName config changed to: %v", config.ResourceName)
 	}
 }

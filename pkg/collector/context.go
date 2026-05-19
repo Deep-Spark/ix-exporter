@@ -174,18 +174,3 @@ func (ctx *ixContext) getMetrics() MetricsMap {
 
 	return ctx.metricss
 }
-
-func (ctx *ixContext) storeMetrics(metrics MetricsMap) {
-	for uuid, ms := range metrics {
-		var metrics []*Metric
-		for _, m := range ms {
-			for _, key := range ctx.labels {
-				if _, ok := m.labels[key]; !ok {
-					m.labels[key] = ""
-				}
-			}
-			metrics = append(metrics, m)
-		}
-		ctx.metricss[uuid] = metrics
-	}
-}

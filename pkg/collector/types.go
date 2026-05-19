@@ -19,6 +19,8 @@ package collector
 
 import (
 	"gitee.com/deep-spark/go-ixml/pkg/ixml"
+	udev "github.com/jochenvg/go-udev"
+	"k8s.io/client-go/kubernetes"
 )
 
 type Options struct {
@@ -27,13 +29,19 @@ type Options struct {
 	IP            string
 	Port          string
 	MetricsConfig string
-	EnableKube    bool
 	UseRemoteHE   bool
 	RemoteHEInfo  string
+	IxDevCh       <-chan *udev.Device
+
+	EnableK8s bool
+	Namespace string
+	NodeName  string
+	ClientSet kubernetes.Interface
 }
 
 type SysInfo struct {
 	driverVersion string
+	ixmlVersion   string
 	cudaVersion   string
 	GPUCount      uint
 	GPUs          map[string]GpuInfo // key is gpu uuid
@@ -41,9 +49,10 @@ type SysInfo struct {
 }
 
 type GpuInfo struct {
-	index uint
-	uuid  string
-	name  string
+	index  uint
+	uuid   string
+	name   string
+	serial string
 }
 
 type Metric struct {

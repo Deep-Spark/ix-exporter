@@ -19,6 +19,8 @@ package collector
 
 import (
 	"fmt"
+
+	"strconv"
 	"time"
 
 	"gitee.com/deep-spark/go-ixml/pkg/ixml"
@@ -43,31 +45,21 @@ type IXCollector struct {
 
 func NewIXCollector(opts *Options) (*IXCollector, error) {
 	cfg := config.MetricConfig{
-		ConfigFile: opts.MetricsConfig,
-		MetricsMap: make(map[string]config.MetricItemList),
+		ConfigFile:    opts.MetricsConfig,
+		MetricsLabels: &config.MetricsLabels{},
 	}
 	if err := cfg.ParseMetricConfig(); err != nil {
 		logger.IXLog.Errorf("Error parsing config: %s", err)
 		return nil, err
 	}
-	ixMetrics, ok := cfg.MetricsMap[Iluvatar]
-	if !ok {
-		logger.IXLog.Errorf("Iluvatar configuration not found")
-		return nil, fmt.Errorf("iluvatar configuration not found")
-	}
 
-	var labels []string
-	if opts.EnableKube {
-		labels = LabelAllList
-	} else {
-		labels = LabelList
-	}
+	labels, _ := cfg.ParseLabelConfig(opts.EnableK8s)
 
 	return &IXCollector{
 		opts:       opts,
 		sysinfo:    getDeviceInfo(),
 		resources:  make(map[string]*prometheus.Desc),
-		cfgMetrics: ixMetrics.Metrics,
+		cfgMetrics: cfg.MetricsLabels.Metrics,
 		cfgLabels:  labels,
 		ctx:        nil,
 	}, nil
@@ -92,6 +84,7 @@ func (ic *IXCollector) Describe(ch chan<- *prometheus.Desc) {
 			} else {
 				labelsForDesc = ic.cfgLabels
 			}
+
 			desc := prometheus.NewDesc(mc.Name, mc.Help, labelsForDesc, nil)
 			ic.resources[mc.Name] = desc
 			ch <- desc
@@ -137,18 +130,33 @@ func collectDriverVers(info *SysInfo) error {
 
 	info.GPUCount, ret = ixml.DeviceGetCount()
 	if ret != ixml.SUCCESS {
-		logger.IXLog.Errorf("Unable to get device count: %v", ret)
-		return fmt.Errorf("unable to get device count: %v", ret)
+		return fmt.Errorf("unable to get device count, ret: %v", ret)
 	}
+	logger.IXLog.Infof("GPU count: %d", info.GPUCount)
 
 	info.driverVersion, ret = ixml.SystemGetDriverVersion()
 	if ret != ixml.SUCCESS {
-		logger.IXLog.Warningf("Unable to get driver version: %v", ret)
+		return fmt.Errorf("unable to get device version, ret: %v", ret)
 	}
+	logger.IXLog.Infof("Driver version: %s", info.driverVersion)
+
+	info.ixmlVersion, ret = ixml.SystemGetNVMLVersion()
+	if ret != ixml.SUCCESS {
+		return fmt.Errorf("unable to get ixml version, ret: %v", ret)
+	}
+	logger.IXLog.Infof("IXML version: %s", info.ixmlVersion)
 
 	info.cudaVersion, ret = ixml.SystemGetCudaDriverVersion()
 	if ret != ixml.SUCCESS {
 		logger.IXLog.Warningf("Unable to get cuda driver version: %v", ret)
+	} else {
+		cudaVersionInt, err := strconv.Atoi(info.cudaVersion)
+		if err != nil {
+			logger.IXLog.Warningf("Unable to convert cuda version %s: %v", info.cudaVersion, err)
+		} else {
+			major, minor := uint(cudaVersionInt)/1000, uint(cudaVersionInt)%1000/10
+			logger.IXLog.Infof("Cuda version:  %d.%d", major, minor)
+		}
 	}
 	return nil
 }
@@ -161,20 +169,26 @@ func processDeviceAtIndex(info *SysInfo, index uint, boardChips *[]chip) error {
 
 	ret := ixml.DeviceGetHandleByIndex(index, &device)
 	if ret != ixml.SUCCESS {
-		logger.IXLog.Errorf("Unable to get device at index %d: %v", index, ret)
-		return fmt.Errorf("unable to get device at index %d: %v", index, ret)
+		return fmt.Errorf("unable to get device handle by index, ret: %v", ret)
 	}
 
-	gpu.name, ret = device.GetName()
+	name, ret := device.GetName()
 	if ret != ixml.SUCCESS {
-		logger.IXLog.Warningf("Unable to get name %v", ret)
+		return fmt.Errorf("unable to get device name, ret: %v", ret)
 	}
+	gpu.name = name
 
 	uuid, ret := device.GetUUID()
 	if ret != ixml.SUCCESS {
-		logger.IXLog.Warningf("Unable to get device uuid %v", ret)
+		return fmt.Errorf("unable to get device uuid, ret: %v", ret)
 	}
 	gpu.uuid = uuid
+
+	serial, ret := device.GetSerial()
+	if ret != ixml.SUCCESS {
+		return fmt.Errorf("unable to get device serial, ret: %v", ret)
+	}
+	gpu.serial = serial
 
 	pos, ret := device.GetBoardPosition()
 	if ret != ixml.SUCCESS {
@@ -182,7 +196,7 @@ func processDeviceAtIndex(info *SysInfo, index uint, boardChips *[]chip) error {
 			logger.IXLog.Infof("GPU %s not support splitboard.", gpu.uuid)
 			info.pairChips[uuid] = uuid
 		} else {
-			return fmt.Errorf("Failed to get board position of %s, ret: %v", gpu.uuid, ret)
+			return fmt.Errorf("failed to get board position of %s, ret: %v", gpu.uuid, ret)
 		}
 	} else {
 		logger.IXLog.Infof("The board position of %s is: %d", gpu.uuid, pos)
@@ -217,6 +231,7 @@ func getDeviceInfo() SysInfo {
 	info.GPUs = make(map[string]GpuInfo)
 
 	if err := collectDriverVers(&info); err != nil {
+		logger.IXLog.Error(err)
 		return info
 	}
 

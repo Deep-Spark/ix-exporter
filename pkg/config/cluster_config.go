@@ -24,35 +24,26 @@ import (
 )
 
 const (
-	IXResourceName  = "iluvatar.com/gpu"
-	IXConfigMap     = "ix-config"
-	IXConfigDataKey = "ix-config"
+	IXConfigMap = "ix-config"
+	IXConfigKey = "ix-config"
 )
 
-var SplitBoard bool = false // default is false, set to true if splitboard is enabled
+var (
+	ResourceName = "iluvatar.com/gpu"
+	SplitBoard   = false // default is false, set to true if splitboard is enabled
+	ResetGpu     = false // default is false, set to true if support reset gpu
+)
 
 type Flags struct {
 	SplitBoard bool `json:"splitboard"                yaml:"splitboard"`
-}
-
-type ReplicatedResources struct {
-	Replicas int `json:"replicas"         yaml:"replicas"`
-}
-
-// Sharing encapsulates the set of sharing strategies that are supported.
-type Sharing struct {
-	// TimeSlicing defines the set of replicas to be made for timeSlicing available resources.
-	TimeSlicing ReplicatedResources `json:"timeSlicing,omitempty" yaml:"timeSlicing,omitempty"`
-	// MPS defines the set of replicas to be shared using MPS
-	MPS *ReplicatedResources `json:"mps,omitempty"         yaml:"mps,omitempty"`
+	UseVolcano bool `json:"usevolcano,omitempty"      yaml:"usevolcano"`
+	ResetGpu   bool `json:"reset_gpu,omitempty"       yaml:"reset_gpu"`
 }
 
 // Config is a versioned struct used to hold configuration information.
 type ClusterConfig struct {
-	Version      string  `json:"version,omitempty"   yaml:"version,omitempty"`
-	ResourceName string  `json:"resourceName"        yaml:"resourceName"`
-	Flags        Flags   `json:"flags,omitempty"     yaml:"flags,omitempty"`
-	Sharing      Sharing `json:"sharing,omitempty"   yaml:"sharing,omitempty"`
+	ResourceName string `json:"resourceName"        yaml:"resourceName"`
+	Flags        Flags  `json:"flags,omitempty"     yaml:"flags,omitempty"`
 }
 
 func ParseClusterConfig(yamlStr string) (*ClusterConfig, error) {
