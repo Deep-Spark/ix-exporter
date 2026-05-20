@@ -2,11 +2,12 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-image: "registry.iluvatar.com.cn:10443/k8s/ix-exporter:4.3.0" # Replace it with your image address.
+image: "registry.iluvatar.com.cn:10443/k8s/ix-exporter:4.4.0-x86_64" # Replace it with your image address.
+imagePullPolicy: IfNotPresent # Replace it with your imagePullPolicy.
 
 daemonset:
   logLevel: "4" # Set the log level (0-6), 0-panic, 1-fatal, 2-error, 3-warn, 4-info, 5-debug, 6-trace, defalut is 4.
-  logFile: "/tmp/log/ix-exporter.log"
+  resourceName: "iluvatar.com/gpu" # The resource name of gpu in kubernetes.
 
 service:
   ip: "0.0.0.0" # The service ip to provide metrics
@@ -14,7 +15,6 @@ service:
 
 serviceMonitor: 
   enabled: false # Set to true to enable the creation of a ServiceMonitor
-  namespace: "monitoring" # The namespace where the ServiceMonitor will be created
   interval: 30s
   honorLabels: false # Controls whether Prometheus preserves the metric's labels when they collide with the target's labels.
   honorTimestamps: false # Controls whether Prometheus preserves the timestamps when exposed by the target.

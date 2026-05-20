@@ -30,7 +30,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 )
 
@@ -51,20 +50,8 @@ type kubeCollector struct {
 	timeout   time.Duration
 }
 
-func initClientSet() kubernetes.Interface {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		logger.IXLog.Printf("Failed to get in cluster config, err: %v", err)
-	}
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		logger.IXLog.Printf("Failed to create clientset, err: %v", err)
-	}
-	return clientset
-}
-
 func InitKubeCollector(ic *IXCollector) {
-	if !ic.opts.EnableKube {
+	if !ic.opts.EnableK8s {
 		return
 	}
 	logger.IXLog.Infof("Init kube collector.")
@@ -79,7 +66,7 @@ func InitKubeCollector(ic *IXCollector) {
 		logger.IXLog.Errorf("Failed to find socket file: '%s'\n", socketFile)
 		return
 	}
-	kc.clientset = initClientSet()
+	kc.clientset = ic.opts.ClientSet
 	ic.ctx.registerCollector(kc)
 	go kc.collect(ic.ctx)
 }
@@ -111,9 +98,9 @@ func (kc *kubeCollector) collectMetrics(ctx *ixContext) {
 			logger.IXLog.Infof("Pod %s in namespace %s is running on node: %s", pod.name, pod.namespace, ctx.nodeName)
 
 			labels[uuid] = LabelsMap{
-				"container": pod.container,
-				"pod":       pod.name,
-				"namespace": pod.namespace,
+				config.LabelContainer: pod.container,
+				config.LabelPod:       pod.name,
+				config.LabelNamespace: pod.namespace,
 			}
 		}
 	}
@@ -131,7 +118,7 @@ func (kc *kubeCollector) filterGpuPods(pods *podresourcesapi.ListPodResourcesRes
 		for _, container := range pod.GetContainers() {
 			for _, containerDevices := range container.GetDevices() {
 				resourceName := containerDevices.GetResourceName()
-				if resourceName != config.IXResourceName {
+				if resourceName != config.ResourceName {
 					continue
 				}
 				var gpuUuids []string

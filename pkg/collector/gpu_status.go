@@ -34,8 +34,29 @@ import (
 )
 
 type IXGpuStatus struct {
-	ixdcgm.DeviceStatus
-	ixdcgm.DeviceProfStatus
+	Id      uint
+	Power   string // "N/A" or float64 str, W
+	GpuTemp string // "N/A" or int64 str, °C
+	MemTemp string // "N/A" or int64 str, °C
+
+	Utilization ixdcgm.UtilizationInfo
+	Clocks      ixdcgm.ClockInfo
+	Performance ixdcgm.PerfState
+	MemUsage    ixdcgm.MemoryUsage
+
+	// pcie status
+	PcieTxThroughput  string // "N/A" or int64 str
+	PcieRxThroughput  string // "N/A" or int64 str
+	PcieReplayCounter string // "N/A" or int64 str
+
+	FanSpeed     string // "N/A" or int64 str, %
+	EccSbeVolDev string // "N/A" or int64 str, 1 for errors occurred, 0 for no errors
+	EccDbeVolDev string // "N/A" or int64 str, 1 for errors occurred, 0 for no errors
+	XidErrors    int64  // 0 for no errors
+
+	SmActive    string // "N/A" or float64 str, %
+	SmOccupancy string // "N/A" or float64 str, %
+	DramActive  string // "N/A" or float64 str, %
 }
 
 type ProcessInfo struct {
@@ -47,12 +68,15 @@ var StatusMetrics = []string{
 	IxMemFree,
 	IxMemUsed,
 	IxTemperature,
+	IxGpuTemperature,
+	IxMemTemperature,
 	IxPowerUsage,
 	IxFanSpeed,
 	IxSmClock,
 	IxMemClock,
 	IxMemUtilization,
 	IxGpuUtilization,
+	IxXidErrors,
 	IxEccSbeVolStatus,
 	IxEccDbeVolStatus,
 	IxSmUtilization,
@@ -74,6 +98,7 @@ type gpuStatusGather struct {
 const (
 	IdxPower int = iota
 	IdxGpuTemp
+	IdxMemTemp
 	IdxGpuUtil
 	IdxMemUtil
 	IdxSmClock
@@ -82,6 +107,7 @@ const (
 	IdxPcieTxThroughput
 	IdxPcieReplayCounter
 	IdxFanSpeed
+	IdxXidErrors
 	IdxEccSbeVolDev
 	IdxEccDbeVolDev
 	IdxMemTotal
@@ -97,6 +123,7 @@ func NewGpuStatusGather(gpuIds []uint) (*gpuStatusGather, error) {
 	fields := make([]ixdcgm.Short, FieldsCount)
 	fields[IdxPower] = ixdcgm.DCGM_FI_DEV_POWER_USAGE
 	fields[IdxGpuTemp] = ixdcgm.DCGM_FI_DEV_GPU_TEMP
+	fields[IdxMemTemp] = ixdcgm.DCGM_FI_DEV_MEMORY_TEMP
 	fields[IdxGpuUtil] = ixdcgm.DCGM_FI_DEV_GPU_UTIL
 	fields[IdxMemUtil] = ixdcgm.DCGM_FI_DEV_MEM_COPY_UTIL
 	fields[IdxSmClock] = ixdcgm.DCGM_FI_DEV_SM_CLOCK
@@ -105,6 +132,7 @@ func NewGpuStatusGather(gpuIds []uint) (*gpuStatusGather, error) {
 	fields[IdxPcieTxThroughput] = ixdcgm.DCGM_FI_DEV_PCIE_TX_THROUGHPUT
 	fields[IdxPcieReplayCounter] = ixdcgm.DCGM_FI_DEV_PCIE_REPLAY_COUNTER
 	fields[IdxFanSpeed] = ixdcgm.DCGM_FI_DEV_FAN_SPEED
+	fields[IdxXidErrors] = ixdcgm.DCGM_FI_DEV_XID_ERRORS
 	fields[IdxEccSbeVolDev] = ixdcgm.DCGM_FI_DEV_ECC_SBE_VOL_DEV
 	fields[IdxEccDbeVolDev] = ixdcgm.DCGM_FI_DEV_ECC_DBE_VOL_DEV
 	fields[IdxMemTotal] = ixdcgm.DCGM_FI_DEV_FB_TOTAL
@@ -161,7 +189,8 @@ func (gather *gpuStatusGather) GetGpuStatus() (map[uint]*IXGpuStatus, error) {
 		gs := new(IXGpuStatus)
 		gs.Id = gpuId
 		gs.Power = ixdcgm.GetFieldValueStr(values[IdxPower], "float64")
-		gs.Temperature = ixdcgm.GetFieldValueStr(values[IdxGpuTemp], "int64")
+		gs.GpuTemp = ixdcgm.GetFieldValueStr(values[IdxGpuTemp], "int64")
+		gs.MemTemp = ixdcgm.GetFieldValueStr(values[IdxMemTemp], "int64")
 		gs.Utilization = ixdcgm.UtilizationInfo{
 			Gpu: values[IdxGpuUtil].Int64(),
 			Mem: values[IdxMemUtil].Int64(),
@@ -170,17 +199,18 @@ func (gather *gpuStatusGather) GetGpuStatus() (map[uint]*IXGpuStatus, error) {
 			Sm:  values[IdxSmClock].Int64(),
 			Mem: values[IdxMemClock].Int64(),
 		}
-		gs.PCI = ixdcgm.PCIStatusInfo{
-			Rx:            values[IdxPcieRxThroughput].Int64(),
-			Tx:            values[IdxPcieTxThroughput].Int64(),
-			ReplayCounter: values[IdxPcieReplayCounter].Int64(),
-		}
+
+		gs.PcieRxThroughput = ixdcgm.GetFieldValueStr(values[IdxPcieRxThroughput], "int64")
+		gs.PcieTxThroughput = ixdcgm.GetFieldValueStr(values[IdxPcieTxThroughput], "int64")
+		gs.PcieReplayCounter = ixdcgm.GetFieldValueStr(values[IdxPcieReplayCounter], "int64")
+
 		gs.MemUsage = ixdcgm.MemoryUsage{
 			Total: values[IdxMemTotal].Int64(),
 			Free:  values[IdxMemFree].Int64(),
 			Used:  values[IdxMemUsed].Int64(),
 		}
 		gs.FanSpeed = ixdcgm.GetFieldValueStr(values[IdxFanSpeed], "int64")
+		gs.XidErrors = values[IdxXidErrors].Int64()
 		gs.EccSbeVolDev = ixdcgm.GetFieldValueStr(values[IdxEccSbeVolDev], "int64")
 		gs.EccDbeVolDev = ixdcgm.GetFieldValueStr(values[IdxEccDbeVolDev], "int64")
 
@@ -226,16 +256,26 @@ func (gc *gpuCollector) getStatusMetrics(gpu *GpuInfo, labels map[string]string)
 				value = float64(devStatus.Utilization.Gpu)
 			case IxMemUtilization:
 				value = float64(devStatus.Utilization.Mem)
+			case IxXidErrors:
+				value = float64(devStatus.XidErrors)
 			case IxPcieRxThroughput:
-				value = float64(devStatus.PCI.Rx)
+				valueStrFlag = true
+				valueStr = devStatus.PcieRxThroughput
 			case IxPcieTxThroughput:
-				value = float64(devStatus.PCI.Tx)
+				valueStrFlag = true
+				valueStr = devStatus.PcieTxThroughput
 			case IxPcieReplayCounter:
-				value = float64(devStatus.PCI.ReplayCounter)
-
+				valueStrFlag = true
+				valueStr = devStatus.PcieReplayCounter
 			case IxTemperature:
 				valueStrFlag = true
-				valueStr = devStatus.Temperature
+				valueStr = devStatus.GpuTemp
+			case IxGpuTemperature:
+				valueStrFlag = true
+				valueStr = devStatus.GpuTemp
+			case IxMemTemperature:
+				valueStrFlag = true
+				valueStr = devStatus.MemTemp
 			case IxPowerUsage:
 				valueStrFlag = true
 				valueStr = devStatus.Power
@@ -298,12 +338,4 @@ func getProcessNameByPid(pid uint32) string {
 	}
 	data = bytes.ReplaceAll(data, []byte{0}, []byte{' '})
 	return strings.TrimSpace(strings.TrimSuffix(string(data), "\x00"))
-}
-
-func collectXidErrors(device ixml.Device) (uint64, error) {
-	clocksThrottleReasons, ret := device.GetCurrentClocksThrottleReasons()
-	if ret != ixml.SUCCESS {
-		return 0, fmt.Errorf("%v", ret)
-	}
-	return clocksThrottleReasons, nil
 }

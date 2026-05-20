@@ -1,10 +1,6 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
-gitee.com/deep-spark/go-ixdcgm v0.0.0-20250402060448-47ce1e307b56 h1:ysApmFmAOSAEILvC8FzjIHXLuQNh7BIktqyDUaMFg8k=
-gitee.com/deep-spark/go-ixdcgm v0.0.0-20250402060448-47ce1e307b56/go.mod h1:+Om/buT5cRBlzdks9ar1YXNXNkxibwvytOuht6SfzHY=
 gitee.com/deep-spark/go-ixdcgm v0.0.0-20250528014305-d6758dddbdab h1:SybPKRlfZC+lF2gzjqE6v0HsMw5d79ptVeVwLOzupFg=
 gitee.com/deep-spark/go-ixdcgm v0.0.0-20250528014305-d6758dddbdab/go.mod h1:+Om/buT5cRBlzdks9ar1YXNXNkxibwvytOuht6SfzHY=
-gitee.com/deep-spark/go-ixml v0.0.0-20250402060659-7a8e7dc6e049 h1:Jtw6ZUZc7VEQTgRJ6RB5gQnAY/4ysU7PmKhTBroqqTE=
-gitee.com/deep-spark/go-ixml v0.0.0-20250402060659-7a8e7dc6e049/go.mod h1:UBRqak7S0kqCXMu8RTNyFRhoz9qAOPEM5Bl1pB7og8w=
 gitee.com/deep-spark/go-ixml v0.0.0-20250616014525-a1a4e063554a h1:jRFwoF/iocqkURd6UXkGpgftP34xcKB24HEc48LZVeM=
 gitee.com/deep-spark/go-ixml v0.0.0-20250616014525-a1a4e063554a/go.mod h1:UBRqak7S0kqCXMu8RTNyFRhoz9qAOPEM5Bl1pB7og8w=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
@@ -70,6 +66,10 @@ github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1 h1:K6RDEckDVWvDI9JAJY
 github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1/go.mod h1:kpwsk12EmLew5upagYY7GY0pfYCcupk39gWOCRROcvE=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+github.com/jkeiser/iter v0.0.0-20200628201005-c8aa0ae784d1 h1:smvLGU3obGU5kny71BtE/ibR0wIXRUiRFDmSn0Nxz1E=
+github.com/jkeiser/iter v0.0.0-20200628201005-c8aa0ae784d1/go.mod h1:fP/NdyhRVOv09PLRbVXrSqHhrfQypdZwgE2L4h2U5C8=
+github.com/jochenvg/go-udev v0.0.0-20240801134859-b65ed646224b h1:Pzf7tldbCVqwl3NnOnTamEWdh/rL41fsoYCn2HdHgRA=
+github.com/jochenvg/go-udev v0.0.0-20240801134859-b65ed646224b/go.mod h1:IBDUGq30U56w969YNPomhMbRje1GrhUsCh7tHdwgLXA=
 github.com/josharian/intern v1.0.0 h1:vlS4z54oSdjm0bgjRigI+G1HpF+tI+9rE5LLzOg8HmY=
 github.com/josharian/intern v1.0.0/go.mod h1:5DoeVV0s6jJacbCEi61lwdGj/aVlrQvzHFFd8Hwg//Y=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
@@ -153,8 +153,6 @@ golang.org/x/net v0.0.0-20201021035429-f5854403a974/go.mod h1:sp8m0HH+o8qH0wwXwY
 golang.org/x/net v0.30.0 h1:AcW1SDZMkb8IpzCdQUaIq2sP4sZ4zw+55h6ynffypl4=
 golang.org/x/net v0.30.0/go.mod h1:2wGyMJ5iFasEhkwi13ChkO/t1ECNC4X4eBKkVFyYFlU=
 golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be/go.mod h1:N/0e6XlmueqKjAGxoOufVs8QHGRruUQn6yWY3a++T0U=
-golang.org/x/oauth2 v0.21.0 h1:tsimM75w1tF/uws5rbeHzIWxEqElMehnc+iW793zsZs=
-golang.org/x/oauth2 v0.21.0/go.mod h1:XYTD2NtWslqkgxebSiOHnXEap4TF09sJSc7H1sXbhtI=
 golang.org/x/oauth2 v0.27.0 h1:da9Vo7/tDv5RH/7nZDz1eMGS/q1Vv1N/7FCrBhI9I3M=
 golang.org/x/oauth2 v0.27.0/go.mod h1:onh5ek6nERTohokkhCD/y2cV4Do3fxFHFuAejCkRWT8=
 golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=

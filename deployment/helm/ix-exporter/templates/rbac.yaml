@@ -18,6 +18,8 @@ kind: ServiceAccount
 metadata:
   name: service-account-{{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -25,16 +27,12 @@ kind: ClusterRole
 metadata:
   name: cluster-role-{{ .Release.Name }}
 rules:
-  - apiGroups:
-      - ""
-    resources:
-      - pods
-      - nodes
-      - configmaps
-    verbs:
-      - get
-      - list
-      - watch
+  - apiGroups: [""]
+    resources: ["pods", "nodes", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "update", "patch"]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -47,5 +45,36 @@ roleRef:
   name: cluster-role-{{ .Release.Name }}
 subjects:
   - kind: ServiceAccount
-    name: {{ .Chart.Name }}
+    name: service-account-{{ .Release.Name }}
+    namespace: {{ .Release.Namespace }}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: role-job-{{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    resourceNames: ["{{ .Release.Name }}"]
+    verbs: ["get", "list", "watch", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rolebinding-job-{{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: role-job-{{ .Release.Name }}
+subjects:
+  - kind: ServiceAccount
+    name: service-account-{{ .Release.Name }}
     namespace: {{ .Release.Namespace }}

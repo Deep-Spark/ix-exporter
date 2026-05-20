@@ -20,7 +20,7 @@ metadata:
     app.kubernetes.io/name: ix-exporter
     app.kubernetes.io/part-of: kube-prometheus
   name: ix-exporter
-  namespace: monitoring
+  namespace: kube-system
 spec:
   endpoints:
     - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token

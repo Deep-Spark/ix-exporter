@@ -18,25 +18,14 @@ limitations under the License.
 package cmd
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"net"
-	"os"
-	"os/signal"
 	"strconv"
-	"syscall"
-	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli/v2"
 
-	"gitee.com/deep-spark/go-ixdcgm/pkg/ixdcgm"
-	"gitee.com/deep-spark/go-ixml/pkg/ixml"
-	"gitee.com/deep-spark/ixexporter/pkg/collector"
-	"gitee.com/deep-spark/ixexporter/pkg/informer"
+	"gitee.com/deep-spark/ixexporter/pkg/config"
 	"gitee.com/deep-spark/ixexporter/pkg/logger"
-	"gitee.com/deep-spark/ixexporter/pkg/server"
 )
 
 const (
@@ -47,6 +36,7 @@ const (
 	CLIRemoteHostEngine = "remote-ix-hostengine"
 	CLIServiceIP        = "ip"
 	CLIServicePort      = "port"
+	CLIResourceName     = "resource-name"
 )
 
 var (
@@ -55,7 +45,7 @@ var (
 	IPFlag            string
 	PortFlag          string
 	MetricsConfigFlag string
-	EnableKubeFlag    bool
+	EnableK8sFlag     bool
 )
 
 const (
@@ -97,13 +87,13 @@ func NewApp(buildVersion ...string) *cli.App {
 			Aliases:     []string{"k"},
 			Value:       false,
 			Usage:       "Enable kubernetes.",
-			Destination: &EnableKubeFlag,
+			Destination: &EnableK8sFlag,
 			EnvVars:     []string{"IX_EXPORTER_ENABLE_KUBERNETES"},
 		},
 		&cli.StringFlag{
 			Name:        CLIMetricConfig,
 			Aliases:     []string{"c"},
-			Value:       "/etc/ixexporter/metrics.yaml",
+			Value:       "/opt/ix-exporter/metrics.yaml",
 			Usage:       "Path of metrics config file which contains of all fields.",
 			Destination: &MetricsConfigFlag,
 			EnvVars:     []string{"IX_EXPORTER_METRICS_CONFIG"},
@@ -128,6 +118,13 @@ func NewApp(buildVersion ...string) *cli.App {
 			Usage:       "Service port.",
 			Destination: &PortFlag,
 			EnvVars:     []string{"IX_EXPORTER_SERVICE_PORT"},
+		},
+		&cli.StringFlag{
+			Name:        CLIResourceName,
+			Value:       "iluvatar.com/gpu",
+			Usage:       "Resource name of gpu in kubernetes.",
+			Destination: &config.ResourceName,
+			EnvVars:     []string{"IX_EXPORTER_RESOURCE_NAME"},
 		},
 	}
 
@@ -168,115 +165,4 @@ func verifyFlags(c *cli.Context) error {
 
 	logger.IXLog.Infof("All cli flags are verified successfully!")
 	return nil
-}
-
-func start(c *cli.Context) error {
-	opts := configToOpts(c)
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
-	defer close(sig)
-
-	if opts.EnableKube {
-		if err := informer.StartIxInformer(opts, sig); err != nil {
-			return fmt.Errorf("failed to start ix informer: %v", err)
-		}
-		logger.IXLog.Info("ix informer started successfully!")
-	}
-
-	for {
-		loop, err := startMetricsServer(opts, sig)
-		if err != nil {
-			return fmt.Errorf("failed to start metrics server: %v", err)
-		}
-		if loop {
-			logger.IXLog.Info("Restarting ix-exporter due to SIGHUP signal.")
-			time.Sleep(1 * time.Second) // Sleep before restarting
-		} else {
-			logger.IXLog.Info("Exiting ix-exporter gracefully.")
-			break
-		}
-	}
-
-	return nil
-}
-
-func startMetricsServer(opts *collector.Options, sig chan os.Signal) (loop bool, err error) {
-	ret := ixml.Init()
-	if ret != ixml.SUCCESS {
-		return false, fmt.Errorf("failed to init IXML: %v", ret)
-	}
-	logger.IXLog.Info("IXML successfully initialized!")
-
-	cleanupIxDCGM, err := initIxDCGM(opts)
-	if err != nil {
-		return false, fmt.Errorf("failed to init IxDCGM: %v", err)
-	}
-	logger.IXLog.Info("IxDCGM successfully initialized!")
-
-	// Create a new context for this run of the exporter
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	reg := prometheus.NewRegistry()
-	ixCollector, err := collector.NewIXCollector(opts)
-	if err != nil {
-		logger.IXLog.Errorf("Failed to create iluvatar collector: %v", err)
-		return false, err
-	}
-	reg.MustRegister(ixCollector)
-
-	mServer := server.NewMetricsServer(opts, reg)
-	go func() {
-		mServer.Run(ctx, cancel)
-	}()
-
-	s := <-sig
-	logger.IXLog.Infof("Received signal: %s", s.String())
-	cancel()
-
-	logger.IXLog.Infof("Shutting down ix-exporter gracefully...")
-	reg.Unregister(ixCollector)
-	ixml.Shutdown()
-	cleanupIxDCGM()
-
-	if s != syscall.SIGHUP {
-		return false, nil
-	}
-
-	return true, nil
-}
-
-func configToOpts(c *cli.Context) *collector.Options {
-	return &collector.Options{
-		Loglevel:      LoglevelFlag,
-		Logfile:       LogfileFlag,
-		IP:            IPFlag,
-		Port:          PortFlag,
-		EnableKube:    EnableKubeFlag,
-		MetricsConfig: MetricsConfigFlag,
-		UseRemoteHE:   c.IsSet(CLIRemoteHostEngine),
-		RemoteHEInfo:  c.String(CLIRemoteHostEngine),
-	}
-}
-
-func initIxDCGM(ops *collector.Options) (func(), error) {
-	if ops.UseRemoteHE {
-		logger.IXLog.Info("Attempting to connect to remote ix-hostengine at ", ops.RemoteHEInfo)
-		cleanup, err := ixdcgm.Init(ixdcgm.Standalone, ops.RemoteHEInfo, "0")
-		if err != nil {
-			logger.IXLog.Errorf("Failed to connect to remote ix-hostengine: %v", err)
-			cleanup()
-			return nil, err
-		}
-		return cleanup, nil
-	} else {
-		logger.IXLog.Info("Initializing ixdcgm in embedded mode")
-		cleanup, err := ixdcgm.Init(ixdcgm.Embedded)
-		if err != nil {
-			logger.IXLog.Errorf("Failed to initialize ixdcgm in embedded mode: %v", err)
-			cleanup()
-			return nil, err
-		}
-		return cleanup, nil
-	}
 }

@@ -35,6 +35,15 @@ rules:
       - get
       - list
       - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ix-exporter-configmap-editor
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "update", "patch", "create", "delete"]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -45,6 +54,20 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: ix-exporter
+subjects:
+  - kind: ServiceAccount
+    name: ix-exporter
+    namespace: "kube-system"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ix-exporter-configmap-editor
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ix-exporter-configmap-editor
 subjects:
   - kind: ServiceAccount
     name: ix-exporter
@@ -74,12 +97,14 @@ spec:
       priorityClassName: system-node-critical
       serviceAccountName: ix-exporter
       containers:
-        - image: "registry.iluvatar.com.cn:10443/k8s/ix-exporter:4.3.0"
+        - image: "registry.iluvatar.com.cn/k8s/ix-exporter:latest-x86_64"
+          imagePullPolicy: IfNotPresent
           name: "ix-exporter"
           args:
             - --log-level=4
             - --enable-kubernetes=true
             - --ip=0.0.0.0
+            - --resource-name="iluvatar.com/gpu"
           securityContext:
             privileged: true
             runAsNonRoot: false
@@ -107,8 +132,13 @@ spec:
             - name: host-time
               mountPath: /etc/localtime
               readOnly: true
-            - name: tmp-dir
-              mountPath: "/tmp"
+            - mountPath: /sys
+              name: sys
+              readOnly: true
+            - mountPath: /dev
+              name: dev
+            - name: log-dir
+              mountPath: "/var/log/iluvatarcorex"
               readOnly: false
       volumes:
         - name: host-proc
@@ -120,9 +150,16 @@ spec:
         - name: host-time
           hostPath:
             path: /etc/localtime
-        - name: tmp-dir
+        - name: sys
           hostPath:
-            path: "/tmp/iluvatar"
+            path: /sys
+        - name: dev
+          hostPath:
+            path: /dev
+        - name: log-dir
+          hostPath:
+            path: "/var/log/iluvatarcorex"
+            type: DirectoryOrCreate
 
 ---
 kind: Service

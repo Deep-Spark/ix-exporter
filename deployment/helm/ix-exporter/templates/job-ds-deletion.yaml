@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ .Release.Name }}-daemonset-deletion"
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": "hook-succeeded,hook-failed"
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      serviceAccountName: service-account-{{ .Release.Name }}
+      restartPolicy: Never
+      containers:
+        - name: daemonset-deletion
+          image: {{ .Values.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              NS="{{ .Release.Namespace }}"
+              NAME="{{ .Release.Name }}"
+              echo "Hook Job: delete daemonset ${NAME} in ${NS} (ignore if not found)"
+              kubectl delete daemonset "${NAME}" -n "${NS}" --ignore-not-found  2>/dev/null
+
+              echo "Hook Job: waiting for ${NAME} pod to not running ..."
+              for i in $(seq 1 20); do
+                PODS=$(kubectl get pods -n "${NS}" -l app.kubernetes.io/name="${NAME}" --no-headers | grep "Running" 2>/dev/null | wc -l || true)
+                if [ "${PODS}" -eq 0 ]; then
+                  echo "No running ${NAME} pods already, exiting"
+                  exit 0
+                else
+                  echo "${PODS} pod(s) still running after attempt ${i}, sleeping..."
+                fi
+                sleep 3
+              done
+
+              echo "Warn: Timed out waiting for ${NAME} pod to not running"
+              exit 0

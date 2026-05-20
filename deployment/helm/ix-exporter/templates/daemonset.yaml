@@ -49,12 +49,13 @@ spec:
       {{- end }}
       containers:
         - image: {{ .Values.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
           name: {{ .Release.Name }}
           args:
             - --log-level={{ .Values.daemonset.logLevel }}
-            - --log-file={{ .Values.daemonset.logFile }}
             - --ip={{ .Values.service.ip }}
             - --enable-kubernetes=true
+            - --resource-name={{ .Values.daemonset.resourceName }}
           securityContext:
             privileged: true
             runAsNonRoot: false
@@ -82,6 +83,11 @@ spec:
             - name: host-time
               mountPath: /etc/localtime
               readOnly: true
+            - mountPath: /sys
+              name: sys
+              readOnly: true
+            - mountPath: /dev
+              name: dev
             - name: log-dir
               mountPath: "/var/log/iluvatarcorex"
               readOnly: false
@@ -106,6 +112,13 @@ spec:
         - name: host-time
           hostPath:
             path: /etc/localtime
+        - name: sys
+          hostPath:
+            path: /sys
+        - name: dev
+          hostPath:
+            path: /dev
         - name: log-dir
           hostPath:
             path: "/var/log/iluvatarcorex"
+            type: DirectoryOrCreate

@@ -22,7 +22,7 @@ metadata:
     app.kubernetes.io/name: {{ .Release.Name }}
     app.kubernetes.io/part-of: kube-prometheus
   name: {{ .Release.Name }}
-  namespace: {{ .Values.serviceMonitor.namespace }}
+  namespace: {{ .Release.Namespace }}
 spec:
   endpoints:
     - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token

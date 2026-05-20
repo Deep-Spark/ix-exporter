@@ -97,23 +97,22 @@ func (gc *gpuCollector) collectMetrics(ctx *ixContext) {
 	}
 
 	logger.IXLog.Infof("Store gpu device metrics.")
-	ctx.storeMetrics(metrics)
+	for uuid, ms := range metrics {
+		ctx.metricss[uuid] = ms
+	}
 }
 
 func (gc *gpuCollector) collectGpuMetrics(ctx *ixContext, gpu *GpuInfo) []*Metric {
 
 	metrics := make([]*Metric, 0)
-	device, ok := gc.devices[gpu.uuid]
-	if !ok {
-		logger.IXLog.Errorf("Device not found for uuid: %s", gpu.uuid)
-		return metrics
-	}
-
 	baseLabels := map[string]string{
-		LabelUuid:     gpu.uuid,
-		LabelName:     gpu.name,
-		LabelGPU:      strconv.FormatUint(uint64(gpu.index), 10),
-		LabelNodeName: ctx.nodeName,
+		config.LabelGpuUuid:   gpu.uuid,
+		config.LabelGpuName:   gpu.name,
+		config.LabelGpuIdx:    strconv.FormatUint(uint64(gpu.index), 10),
+		config.LabelGpuSerial: gpu.serial,
+		config.LabelNodeName:  ctx.nodeName,
+		config.LabelIxml:      gc.sysinfo.ixmlVersion,
+		config.LabelDriver:    gc.sysinfo.driverVersion,
 	}
 	metrics = append(metrics, gc.getStatusMetrics(gpu, baseLabels)...)
 
@@ -155,17 +154,6 @@ func (gc *gpuCollector) collectGpuMetrics(ctx *ixContext, gpu *GpuInfo) []*Metri
 					labels: pidLabels,
 				})
 			}
-		case IxXidErrors:
-			xidErrs, err := collectXidErrors(device)
-			if err != nil {
-				logger.IXLog.Warnf("Failed to get xid errors for dev %d: %v", gpu.index, err)
-				continue
-			}
-			metrics = append(metrics, &Metric{
-				name:   config.Name,
-				value:  float64(xidErrs),
-				labels: baseLabels,
-			})
 
 		default:
 			logger.IXLog.Warnf("Unknown metric '%s'", config.Name)

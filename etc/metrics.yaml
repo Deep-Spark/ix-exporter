@@ -1,38 +1,60 @@
-iluvatar:
-  metrics:
-    - name: ix_temperature
-      help: The temperature of the iluvatar GPU (C).
-    - name: ix_fan_speed
-      help: Fan speed of iluvatar GPU.
-    - name: ix_sm_clock
-      help: Sm clock of iluvatar GPU (MHz).
-    - name: ix_mem_clock
-      help: Mem clock of iluvatar GPU (MHz).
-    - name: ix_mem_total
-      help: The total physical memory of iluvatar GPU (MiB).
-    - name: ix_mem_used
-      help: The used physical memory of iluvatar GPU (MiB).
-    - name: ix_mem_free
-      help: The free physical memory of iluvatar GPU (MiB).
-    - name: ix_mem_utilization
-      help: The memory utilization of iluvatar GPU (%).
-    - name: ix_gpu_utilization
-      help: The utilization of iluvatar GPU (%).
-    - name: ix_power_usage
-      help: The power usage of iluvatar GPU.
-    - name: ix_process_info
-      help: The process info of iluvatar GPU (MiB).
-    - name: ix_xid_errors
-      help: The Value of the last xid error encountered.
-    - name: ix_ecc_sbe_vol_status
-      help: The single-bit volatile ecc errors status. if the value is 1, errors occurred, otherwise, no errors.
-    - name: ix_ecc_dbe_vol_status
-      help: The double-bit volatile ecc errors status. if the value is 1, errors occurred, otherwise, no errors.
-    - name: ix_pcie_rx_throughput
-      help: The PCIe rx (read) data including both header and payload (KB/s).
-    - name: ix_pcie_tx_throughput
-      help: The PCIe tx (transmit) data including both header and payload (KB/s).
-    - name: ix_pcie_replay_counter
-      help: The PCIe replay counter.
-    - name: ix_sm_utilization
-      help: The utilization of SM (%).
+metrics:
+# Metrics configuration.
+# To hide a metric, comment out its lines with '#'.
+# - name: <metric name>
+#   help: <metric description>
+  - name: ix_temperature
+    help: Deprecated, use ix_gpu_temperature instead.
+  - name: ix_gpu_temperature
+    help: GPU temperature of iluvatar GPU (C).
+  - name: ix_mem_temperature
+    help: Memory temperature of iluvatar GPU (C).
+  - name: ix_fan_speed
+    help: Fan speed of iluvatar GPU (RPM).
+  - name: ix_sm_clock
+    help: Sm clock of iluvatar GPU (MHz).
+  - name: ix_mem_clock
+    help: Mem clock of iluvatar GPU (MHz).
+  - name: ix_mem_total
+    help: Total physical memory of iluvatar GPU (MiB).
+  - name: ix_mem_used
+    help: Used physical memory of iluvatar GPU (MiB).
+  - name: ix_mem_free
+    help: Free physical memory of iluvatar GPU (MiB).
+  - name: ix_mem_utilization
+    help: Memory utilization of iluvatar GPU (%).
+  - name: ix_gpu_utilization
+    help: Utilization of iluvatar GPU (%).
+  - name: ix_power_usage
+    help: Power usage of iluvatar GPU (W).
+  - name: ix_process_info
+    help: Process info of iluvatar GPU (MiB). The PID and name of the process are displayed as labels.
+  - name: ix_xid_errors
+    help: Value of the last xid error encountered.
+  - name: ix_ecc_sbe_vol_status
+    help: Single-bit volatile ecc errors status. if the value is 1, errors occurred, otherwise, no errors.
+  - name: ix_ecc_dbe_vol_status
+    help: Double-bit volatile ecc errors status. if the value is 1, errors occurred, otherwise, no errors.
+  - name: ix_pcie_rx_throughput
+    help: PCIe rx (read) data including both header and payload (KB/s).
+  - name: ix_pcie_tx_throughput
+    help: PCIe tx (transmit) data including both header and payload (KB/s).
+  - name: ix_pcie_replay_counter
+    help: PCIe replay counter.
+  - name: ix_sm_utilization
+    help: SM utilization of iluvatar GPU (%).
+
+labels:  
+# Labels configuration.
+# To hide a label from metrics, comment out its line with '#'.
+# Format: <label key>: <displayed label name>   # description
+  name: name   # The name of the GPU, e.g. "Iluvatar BI-V150S".
+  gpu: gpu   # The index of the GPU.
+  uuid: uuid   # The UUID of the GPU.
+  driver: driver   # The version of the system's GPU driver.
+  ixml: ixml   # The version of the system's IXML library.
+  serial: serial   # The serial number of the GPU.
+  node_name: node_name   # The node name where the GPU is located.
+  namespace: namespace   # The namespace where the GPU pod is located.
+  pod: pod   # The name of the pod where the GPU is located.
+  container: container   # The name of the container where the GPU is located.

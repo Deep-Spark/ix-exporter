@@ -13,20 +13,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ARG KUBE_VERSION=v1.32.0
+
 FROM ubuntu:20.04
 
-RUN mkdir /usr/local/corex
-RUN mkdir /etc/ixexporter
+# Install dependency: `kubectl`
+ARG TARGETARCH
+ARG KUBE_VERSION
+
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/* && \
+    echo "Check: TARGETARCH is ${TARGETARCH}, KUBE_VERSION is ${KUBE_VERSION}" && \
+    curl -fLO "https://dl.k8s.io/release/${KUBE_VERSION}/bin/linux/$TARGETARCH/kubectl" && \
+    chmod +x ./kubectl && \
+    mv ./kubectl /usr/local/bin && \
+    kubectl version --client
+
+RUN mkdir -p /opt/ix-exporter
 
 ARG LIB_DIR
 ARG EXEC
 
-COPY $LIB_DIR /usr/local/corex/lib64
+COPY $LIB_DIR /opt/ix-exporter/lib64
 COPY $EXEC /usr/bin
-COPY etc/metrics.yaml /etc/ixexporter
+COPY etc/metrics.yaml /opt/ix-exporter
 
-ENV LD_LIBRARY_PATH="/usr/local/corex/lib64"
-ENV LIBRARY_PATH="/usr/local/corex/lib64"
+ENV LD_LIBRARY_PATH="/opt/ix-exporter/lib64"
+ENV LIBRARY_PATH="/opt/ix-exporter/lib64"
 
 LABEL io.k8s.display-name="Iluvatar Corex Exporter"
 LABEL name="Iluvatar Corex Exporter"
